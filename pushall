@@ -1,0 +1,121 @@
+#!/bin/env bash
+set -ex
+
+# todo: use detector script to find repos' location
+# repos: 
+odoo=/home/poma/src/odoo
+enterprise=/home/poma/src/enterprise
+upgrade=/home/poma/src/upgrade
+
+obranch=$(git -C $odoo branch --show-current)
+ebranch=$(git -C $enterprise branch --show-current)
+ubranch=$(git -C $upgrade branch --show-current)
+
+TERROR='\e[41;37m'
+TSUCCESS='\e[32m'
+THIGHLIGHT='\e[93m'
+TWARNING='\e[33m'
+TINFO='\e[36m'
+NC='\e[0m'
+
+function get_main_branch() {
+    main_branch=${1%%-*}
+    if [ "$main_branch" = "saas" ]; then
+       removed_saas="${1#saas-}"
+       main_branch="saas-${removed_saas%%-*}"
+    fi
+    echo $main_branch
+}
+
+function switch_or_create() {
+    git -C "$1" switch "$2" 2>/dev/null || err=$?
+    if [ "$err" = "1" ]; then
+      git -C "$1" status
+      exit 1
+    fi
+
+    if [ "$err" = "128" ]; then
+      main_branch=$(get_main_branch $2)
+      git -C "$1" switch -c "$2" "$main_branch"
+    fi
+}
+
+while [ $# -ne 0 ]
+do
+    case "$1" in
+        --sync-to-ent|-se)
+            SYNCO=true
+            ;;
+        --sync-to-com|-sc)
+            SYNCE=true
+            ;;
+        --force|-f)
+            FORCE=true
+            ;;
+        --help|-h|-\?)
+            echo "usage $0 [-se|-so|--sync-odoo|--sync-enterprise] [--force|-f]"
+	    echo "--sync-to-com, -sc: checks out or creates the branch with same name in the enterprise repo" 
+	    echo "--sync-to-ent, -se: checks out or creates the branch with same name in the odoo repo" 
+	    echo "--force, -f: pushes the branches as is, even if odoo and enterprise are at different branches" 
+      exit
+            ;;
+        *)
+            echo -e "${TERROR}Unknown option ${THIGHLIGHT}$1$NC"
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [ "$obranch" != "$ebranch" ]; then
+  if [ -n "$SYNCE" ]; then
+    echo -e "${TINFO} Check out/create ${THIGHLIGHT}$obranch ${TINFO} on enterprise$NC"
+    switch_or_create "$enterprise" "$obranch" || exit $?
+    ebranch=$obranch
+  elif [ -n "$SYNCO" ]; then
+    echo -e "${TINFO} Checking out/create ${THIGHLIGHT}$ebranch ${TINFO} on odoo$NC"
+    switch_or_create "$odoo" "$ebranch" || exit $?
+    obranch=$ebranch
+  elif [ -n "$FORCE" ]; then
+    echo -e "${TERROR}Odoo and Enterprise branches do not match, why would you need a pushall?$NC"
+    exit 2
+  else
+    echo -e "${TINFO}Pushing on different branches ${THIGHLIGHT}$obranch on odoo ${TINFO}and ${THIGHLIGHT}$ebranch on enterprise$NC"
+  fi
+fi
+
+if [ "$ubranch" == "$obranch" ]; then
+  echo -e "${TINFO}Upgrade ${TSUCCESS}Enabled.$NC"
+else
+  echo -e "${TINFO}Upgrade is ${TWARNING}Disabled.$NC"
+fi
+
+MAIN_BRANCH=$(get_main_branch $obranch)
+
+
+echo -e "${TINFO}Fetching$TSUCCESS odoo$THIGHLIGHT origin/${MAIN_BRANCH} $NC"
+git -C $odoo fetch origin ${MAIN_BRANCH}:${MAIN_BRANCH}
+echo -e "${TINFO}Fetching$TSUCCESS enterprise$THIGHLIGHT origin/${MAIN_BRANCH} $NC"
+git -C $enterprise fetch origin ${MAIN_BRANCH}:${MAIN_BRANCH}
+if [ "$ubranch" = "$obranch" ]; then
+  echo -e "${TINFO}Fetching$TSUCCESS upgrade$THIGHLIGHT origin/${MAIN_BRANCH} $NC"
+  git -C $upgrade fetch origin ${MAIN_BRANCH}:${MAIN_BRANCH}
+fi
+
+echo -e "${TINFO}Rebasing$TSUCCESS odoo$TINFO onto$THIGHLIGHT ${MAIN_BRANCH} $NC"
+git -C $odoo rebase ${MAIN_BRANCH}
+echo -e "${TINFO}Rebasing$TSUCCESS enterprise$TINFO onto$THIGHLIGHT ${MAIN_BRANCH} $NC"
+git -C $enterprise rebase ${MAIN_BRANCH}
+if [ "$ubranch" = "$obranch" ]; then
+  echo -e "${TINFO}Rebasing$TSUCCESS upgrade$TINFO onto$THIGHLIGHT ${MAIN_BRANCH} $NC"
+  git -C $upgrade rebase ${MAIN_BRANCH}
+fi
+
+echo -e "${TINFO}Pushing to$THIGHLIGHT github $NC"
+if [ "$ubranch" = "$obranch" ]; then
+  git -C $upgrade push -f --no-verify --set-upstream origin "$ubranch" &
+fi
+git -C $enterprise push -f --no-verify --set-upstream dev "$ebranch" &
+git -C $odoo push -f --no-verify --set-upstream dev "$obranch" &
+wait 
+echo -e "$TSUCCESS>>>>>>>>>> All Done! <<<<<<<<<<<$NC"

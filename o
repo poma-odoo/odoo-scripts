@@ -1,0 +1,350 @@
+#!/usr/bin/env bash
+
+set -e
+# trap read debug
+
+# setup vars
+
+readonly ODOO_ROOT=$(
+    ( test -d "$HOME/git/odoo/odoo/.git" && echo "$HOME/git/odoo" ) ||\
+    ( test -d "$HOME/src/odoo/.git" && echo "$HOME/src" ) ||\
+    ( find "$HOME" -name .git -type d -path '/*/odoo/.git' 2>/dev/null | head -n1 | sed 's#/odoo/.git$##' )
+    )
+if [ -z  "$ODOO_ROOT" ]; then
+  echo "Odoo root not found in $HOME" >&2
+  exit 1
+fi
+readonly ODOO_REPOS="odoo enterprise upgrade documents"
+[ -z "$ODOO_BRANCHES" ] && echo "Retriving active main branches..." && readonly ODOO_BRANCHES=$(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
+readonly ODOO_BIN=$ODOO_ROOT/odoo/odoo-bin
+
+user_email=$(git -C  $ODOO_ROOT/odoo config user.email)
+user_email=${user_email,,}
+readonly ODOO_XGRAM=${user_email%%@*}
+
+# private functions
+function  get_shell_rc() {
+if [[ $SHELL = *zsh ]]; then
+  echo "$HOME/.zshrc"
+elif [[ $SHELL = *bash ]]; then
+  echo "$HOME/.bashrc"
+fi
+}
+
+# Everything from here to '#dodoo end' is interpreted as commands
+#start commands
+function o-help() {
+### -> Display this help
+
+  scripts=$(sed -n '/^#dodoo commands$/,/^#dodoo end$/p' $0)
+  awk '/^function o-/ { gsub(/[()]/ ,""); printf $2""}/^alias o-/ { gsub(/=.*/ ,""); printf $2""} /^\s*###/ { gsub("#",""); print}' <<< $scripts
+  unset scripts
+}
+
+function install() {
+  ### Adds o-Commands to bashrc/zsh
+  RCFILE=$(get_shell_rc)
+  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only  bash and zsh are supported" >&2 && exit 2
+  echo "Retriving active main branches..." && readonly ODOO_BRANCHES=$(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
+  counter=0
+  while [ -f $RCFILE.obak$counter ]; do counter=$(expr $counter + 1); done 
+  cp $RCFILE $RCFILE.obak$counter
+  uninstall
+  echo "#dodoo start" >> $RCFILE
+  echo "export ODOO_ROOT='$ODOO_ROOT'" >>$RCFILE
+  echo "export ODOO_BRANCHES='$ODOO_BRANCHES'" >>$RCFILE
+  echo "export ODOO_REPOS='$ODOO_REPOS'" >>$RCFILE
+  echo "export ODOO_BIN='$ODOO_BIN'" >>$RCFILE
+  echo "export ODOO_XGRAM='$ODOO_XGRAM'" >>$RCFILE
+  echo "function o-help() {" >>$RCFILE
+  echo "    cat << EOF" >>$RCFILE
+  o-help >>$RCFILE
+  echo "EOF">>$RCFILE
+  echo "}">>$RCFILE
+  echo "Setting up for odoo sources in  ODOO_ROOT"
+  sed -n '/^#dodoo commands$/,/^#dodoo end$/p' $0 >> $RCFILE
+  echo "use 'source $RCFILE' or open a new terminal and enjoy!"
+  echo 'Type `o-help` to get help.'
+}
+function update() {
+### : updates odoo main branches (starred ones in the runbot)
+install
+}
+
+function uninstall() {
+  RCFILE=$(get_shell_rc)
+  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only bash and zsh are supported" >&2 && exit 2
+  sed -i '/^#dodoo start/,/^#dodoo end/d' $RCFILE
+}
+
+
+function clone() {
+### -> clones the source code
+
+  read -rp "Hi! What is your tri/XGRAM[$ODOO_XGRAM]? " XGRAM
+  read -rp "and what would you call yourself? " NAME
+
+  XGRAM=${XGRAM:-$ODOO_XGRAM}
+
+  # clone sources
+  ODOO_ROOT=${ODOO_ROOT:-$HOME/src}
+  mkdir -p $ODOO_ROOT
+
+  for repo in $ODOO_REPOS; do
+    git clone "git@github.com:odoo/${repo}.git" $ODOO_ROOT/$repo
+    git="git -C $ODOO_REPO/$repo"
+    $git config user.email "${XGRAM}@odoo.com"
+    $git config user.name "${NAME} (${XGRAM})"
+    $git config code.editor vim
+
+    $git remote add "dev" "git@github.com:odoo-dev/${repo}.git" #add odoo-dev as a new remote
+    $git remote set-url --push origin no_push #remove the possibility to push to odoo (you can only push to dev)
+  done
+  echo "all sources cloned in $ODOO_ROOT"
+  unset git
+  }
+
+# Start of o-functions, everything from here to '#dodoo end' will be copied to bashrc in install
+# these functions will be availabe in shell and as `$0 command`
+#dodoo commands
+
+# Commands
+function o-branch() {
+### : Prints current active branch if synced
+    com=$(git -C $ODOO_ROOT/odoo branch --show-current)
+    ent=$(git -C $ODOO_ROOT/enterprise branch --show-current)
+    if [ ${#com} -gt ${#ent} ];
+    then
+        if [[ $com == $ent* ]];
+        then
+            echo $com
+        else
+            echo "Wrong branches" >&2
+            return 77
+        fi
+    else
+        if [[ $ent == $com* ]];
+        then
+            echo $ent
+        else
+            echo "Wrong branches" >&2
+            return 77
+        fi
+    fi
+unset com ent
+}
+
+function o-branch-com() {
+### : prints current community branch name
+    echo $(git -C $ODOO_ROOT/odoo branch --show-current)
+     
+}
+
+function o-git() {
+### git-command : runs a git command on enterprise and odoo synchronously, and upgrade only if it is on the same branch
+
+# check if branches are synced
+o-branch || return 1 
+ubranch=$(git -C $ODOO_ROOT/upgrade branch --show-current)
+if [ "$(o-branch)" == "$ubranch" ]; then
+  git -C $ODOO_ROOT/upgrade $* &
+fi
+git -C $ODOO_ROOT/enterprise $* &
+git -C $ODOO_ROOT/odoo $* &
+wait
+}
+
+function o-module-path() {
+### module_name : prints absolute path of the module 
+  module=${1:-base}
+  [ -d $ODOO_ROOT/odoo/odoo/addons/$module ] && module_dir=$ODOO_ROOT/odoo/odoo/addons/$module
+  [ -d $ODOO_ROOT/odoo/addons/$module ] && module_dir=$ODOO_ROOT/odoo/addons/$module
+  [ -d $ODOO_ROOT/enterprise/$module ] && module_dir=$ODOO_ROOT/enterprise/$module
+  [ -z $module_dir ] && echo "Module not found $module" >&2 && exit 3
+  echo $module_dir
+  unset module module_dir
+}
+
+function o-get-args() {
+### : tries to find odoo config in order from odoo root or home folder otherwise it generates a minimal commandline options for running odoo
+  [ -f $HOME/.odoorc ] && odoo_args="-c $HOME/.odoorc"
+  [ -f $ODOO_ROOT/.odoorc ] && odoo_args="-c $ODOO_ROOT/.odoorc"
+  [ -f $ODOO_ROOT/odoorc ] && odoo_args="-c $ODOO_ROOT/odoorc"
+  [ -z "$odoo_args" ] && odoo_args="--addons-path=$ODOO_ROOT/odoo/odoo/addons,$ODOO_ROOT/odoo/addons,$ODOO_ROOT/enterprise -d $(o-branch) --limit-time-cpu=99999999 --limit-time-real=99999999 --limit-memory-soft=17179869184 --limit-memory-hard=17179869184"
+  echo $odoo_args
+  unset odoo_args
+}
+
+function o-prune() {
+### : prunes local branches that are not in the remote
+  o-git remote prune dev
+}
+
+function o-update-mains() {
+### : Pull all main branches branches (master and stable)
+for repo in $ODOO_REPOS; do
+  for branch in $ODOO_BRANCHES; do
+    echo "Fetching $repo/$branch..."
+    if ! git -C $ODOO_ROOT/$repo fetch origin $branch:$branch; then
+      echo "Failed to fetch $repo/$branch"
+    fi
+  done
+done
+}
+
+function o-rebase-all() {
+### : rebase active branches to their latest version of main branches, for 15.0-z-y, it pulls 15.0 an rebases active branch to it
+  for repo in $ODOO_REPOS; do
+    git="git -C $ODOO_ROOT/$repo"
+    branch=$($git branch --show-current)
+    main_branch=${branch%%-*}
+    if [[ ! $ODOO_BRANCHES =~ $main_branch ]]; then
+      echo "Wrong branch name, branch name should begin with one of [ $ODOO_BRANCHES ] and a dash (-) e.g. master-xxx-yyy" >&2
+      exit 77
+    fi
+    echo "Firstly, fetching $repo/$main_branch..."
+    if ! $git fetch origin $main_branch:$main_branch; then
+      echo "Failed to fetch origin/$main_branch" >&2
+      exit 88
+    fi
+    echo "Rebasing $repo/$branch onto $repo/$branch..."
+    if ! $git rebase $main_branch; then
+      echo "Rebasing $repo/$branch onto $main_branch failed." >&2
+      exit 99
+    fi
+  done
+  unset git branch main_branch
+}
+
+function o-sync() {
+### repo1 repo2 : create or checkout same branch as current repo1 branch in the repo2 worktree
+  if [ $# -ne 2 ]; then
+    echo "Don't know sync what to what, need two arguments" >&2
+    exit 
+  fi
+
+  src_repo=$1
+  repo=$2
+  src_branch=$(git -C $ODOO_ROOT/$src_repo branch --show-current)
+  branch=$src_branch
+  main_branch=${src_branch%%-*}
+  git="git -C $ODOO_ROOT/$repo"
+  
+  echo "Checking out $branch in $repo"
+  if ! ($git switch "$branch" 2>/dev/null)
+  then
+    $git fetch origin $main_branch:$main_branch
+    $git switch -c $branch $main_branch
+    $git branch --set-upstream-to=dev/$branch
+    # git push -u dev $branch:$branch
+  fi
+unset src_repo repo src_branch branch main_branch git
+}
+
+function o-sync-to-ent() {
+### : create or checkout same branch as current enterprise branch in the community worktree passing -u also sets the upgrade repo
+  o-sync enterprise odoo
+  if [ "$1" = "-u" ]; then
+    o-sync enterprise upgrade
+  fi
+}
+
+function o-sync-to-com() {
+### : create or checkout same branch as current community branch in the enterprise worktree passing -u also sets the upgrade repo
+  o-sync odoo enterprise
+  if [ "$1" = "-u" ]; then
+    o-sync odoo upgrade
+  fi
+}
+
+function o-bin() {
+### : runs odoo
+  $ODOO_BIN `o-get-args`
+}
+
+function o-shell() {
+### : runs shell
+  $ODOO_BIN shell `o-get-args`
+}
+
+function o-test() {
+### test-tags : runs tests and exit
+  $ODOO_BIN `o-get-args` --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=info --test-tags $1 2>&1 | awk '
+    /Starting/ {for(i=7;i<=NF;i++) printf $i " "; printf "\n" } /ERROR/ {trace=1;next} /INFO|ERROR/ {trace=0}trace
+    ' ; echo ${PIPESTATUS[0]}${pipestatus[1]} 
+    #second pipestatus is for zsh
+}
+
+function o-backup() {
+### : copies current database to a temporary dbname-backup
+createdb -T `o-branch` `o-branch`-backup
+}
+
+function o-restore() {
+### : erase current db and retore backup taken with o-backup
+args=`o-get-args`
+pgrep -f odoo-bin
+dropdb `o-branch`
+createdb -T `o-branch`-backup `o-branch`
+}
+
+function o-trans-export() {
+### [-i] module [lang]: installs the module and exports pot, or exports po file for module and selected language. -i means inplace, it overwrite the existing file in module 
+
+if [ "$1" == "-i" ]; then
+  shift
+  mpath=$(o-module-path $1)
+  [ -z $mpath ] && exit 3
+fi
+echo "Extracting${mpath+and replacing original file}..."
+args=`o-get-args`
+[ -z "$2" ] && $ODOO_BIN $args -d $(o-branch) -i ${1:?"module name is required"} --i18n-export ${mpath+$mpath/i18n/}$1.pot --modules $1 --st --log-level=error
+[ -n "$2" ] && $ODOO_BIN $args -d $(o-branch) --i18n-export ${mpath+$mpath/i18n/}$2.po --modules $1 --load-language $2 --language $2 --st --log-level=error
+unset mpath args
+}
+
+function o-trans-update() {
+### module: exports a new pot file and upgrade all po files to match it. Overwrites the original files!
+module=$1
+mpath=$(o-module-path $module)
+[ -z $mpath ] && exit 3
+echo "Extracting current terms to $mpath/i18n/$module.pot..."
+o-trans-export -i $module
+# pushd $mpath/i18n/
+# for trans in  *.po; do
+#   echo "Updating $mpath/i18n/$trans"
+#   msgmerge --update $trans $module.pot
+# done
+# popd
+#   msgmerge --update $trans $module.pot
+
+unset module mpath trans
+}
+alias o-se=o-sync-to-ent
+### -> shortcut for o-sync-ent
+alias o-sc=o-sync-to-com
+### -> shortcut for o-sync-com
+
+#dodoo end
+#end of o-functions
+
+
+COMMANDS=$(sed -n '/^#start commands$/,/^#dodoo end$/p' $0 | awk '/^function [^_]/ { gsub(/[()]/ ,""); printf $2" "}')
+
+ARG_CMD=${1,,}
+if [ -n "$1" ] && [[ " $COMMANDS " =~ ( $ARG_CMD ) ]]; then
+  shift
+  $ARG_CMD $*
+elif [ -n "$1" ] && [[ " $COMMANDS " =~ ( o-$ARG_CMD ) ]]; then
+  shift
+  o-$ARG_CMD $*
+else
+  echo "syntax: $(basename $0) ${COMMANDS// /|}"
+  echo
+  echo "clone: clones the repositories and setup git"
+  echo "install: adds o-commands to shell on next start"
+  echo "uninstall: removes o-commands from shell on next start"
+  echo "update: updates odoo main branches (starred ones in the runbot)"
+  o-help
+  echo "all o-* commands can be invoked without 'o-', e.g '$0 branch' is equal to '$0 o-branch'"
+fi
