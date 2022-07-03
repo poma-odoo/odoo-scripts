@@ -12,7 +12,7 @@ readonly ODOO_ROOT=$(
     )
 if [ -z  "$ODOO_ROOT" ]; then
   echo "Odoo root not found in $HOME" >&2
-  exit 1
+  return 1
 fi
 readonly ODOO_REPOS="odoo enterprise upgrade documents"
 [ -z "$ODOO_BRANCHES" ] && echo "Retriving active main branches..." && readonly ODOO_BRANCHES=$(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
@@ -42,10 +42,10 @@ function o-help() {
 }
 
 function install() {
-  ### Adds o-Commands to bashrc/zsh
+  ### [-n]: Adds o-Commands to bashrc/zsh, -n means do not update main branches from runbot acive branches
   RCFILE=$(get_shell_rc)
-  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only  bash and zsh are supported" >&2 && exit 2
-  echo "Retriving active main branches..." && readonly ODOO_BRANCHES=$(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
+  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only  bash and zsh are supported" >&2 && unset RCFILE && return 2
+  [ ! "$1" = "-n" ] && echo "Retriving active main branches..." && readonly ODOO_BRANCHES=$(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
   counter=0
   while [ -f $RCFILE.obak$counter ]; do counter=$(expr $counter + 1); done 
   cp $RCFILE $RCFILE.obak$counter
@@ -73,7 +73,7 @@ install
 
 function uninstall() {
   RCFILE=$(get_shell_rc)
-  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only bash and zsh are supported" >&2 && exit 2
+  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only bash and zsh are supported" >&2 && unset RCFILE && return 2
   sed -i '/^#dodoo start/,/^#dodoo end/d' $RCFILE
 }
 
@@ -120,6 +120,7 @@ function o-branch() {
             echo $com
         else
             echo "Wrong branches" >&2
+            unset com ent
             return 77
         fi
     else
@@ -128,6 +129,7 @@ function o-branch() {
             echo $ent
         else
             echo "Wrong branches" >&2
+            unset com ent
             return 77
         fi
     fi
@@ -160,9 +162,23 @@ function o-module-path() {
   [ -d $ODOO_ROOT/odoo/odoo/addons/$module ] && module_dir=$ODOO_ROOT/odoo/odoo/addons/$module
   [ -d $ODOO_ROOT/odoo/addons/$module ] && module_dir=$ODOO_ROOT/odoo/addons/$module
   [ -d $ODOO_ROOT/enterprise/$module ] && module_dir=$ODOO_ROOT/enterprise/$module
-  [ -z $module_dir ] && echo "Module not found $module" >&2 && exit 3
+  [ -z $module_dir ] && echo "Module not found $module" >&2 && unset module && return 3
   echo $module_dir
   unset module module_dir
+}
+
+function o-venv() {
+### : enables venv for the branch
+  git="git -C $ODOO_ROOT/odoo"
+  branch=$($git branch --show-current)
+  main_branch=${branch%%-*}
+  if [[ ! $ODOO_BRANCHES =~ $main_branch ]]; then
+    echo "Wrong branch name, branch name should begin with one of [ $ODOO_BRANCHES ] and a dash (-) e.g. master-xxx-yyy" >&2
+    unset git branch main_branch
+    return 77
+  fi
+  . $ODOO_ROOT/.venvs/$main_branch/bin/activate
+  unset git branch main_branch
 }
 
 function o-get-args() {
@@ -200,17 +216,20 @@ function o-rebase-all() {
     main_branch=${branch%%-*}
     if [[ ! $ODOO_BRANCHES =~ $main_branch ]]; then
       echo "Wrong branch name, branch name should begin with one of [ $ODOO_BRANCHES ] and a dash (-) e.g. master-xxx-yyy" >&2
-      exit 77
+      unset git branch main_branch
+      return 77
     fi
     echo "Firstly, fetching $repo/$main_branch..."
     if ! $git fetch origin $main_branch:$main_branch; then
       echo "Failed to fetch origin/$main_branch" >&2
-      exit 88
+      unset git branch main_branch
+      return 88
     fi
     echo "Rebasing $repo/$branch onto $repo/$branch..."
     if ! $git rebase $main_branch; then
       echo "Rebasing $repo/$branch onto $main_branch failed." >&2
-      exit 99
+      unset git branch main_branch
+      return 99
     fi
   done
   unset git branch main_branch
@@ -220,7 +239,7 @@ function o-sync() {
 ### repo1 repo2 : create or checkout same branch as current repo1 branch in the repo2 worktree
   if [ $# -ne 2 ]; then
     echo "Don't know sync what to what, need two arguments" >&2
-    exit 
+    return 
   fi
 
   src_repo=$1
@@ -258,21 +277,69 @@ function o-sync-to-com() {
 }
 
 function o-bin() {
-### : runs odoo
-  $ODOO_BIN `o-get-args`
+### [params]: runs odoo
+  $ODOO_BIN `o-get-args` $*
 }
 
 function o-shell() {
-### : runs shell
-  $ODOO_BIN shell `o-get-args`
+### [params]: runs shell
+  $ODOO_BIN shell `o-get-args` $*
+}
+
+function o-upgrade() {
+### module1[,mudule2,...] : upgrades selected modules and exits
+  $ODOO_BIN `o-get-args` -u $1 --st --log-level info 2>&1 | awk '
+    BEGIN {
+      start=0; 
+      trace=0; 
+      len=80; # progressbar length
+      total=1; # prevent division by zero
+      for(i=1;i<=len;i++) # init progressbar
+        printf "."; 
+      printf "\r" 
+    }
+    /(CRITICAL|ERROR|WARNING)/ {
+      trace=1; # error detected
+      # erase progress bar
+      printf "                                                                                          \n"; 
+    } 
+    /(INFO)/ {
+      trace=0 # end of error
+      # ok, redraw progressbar
+      for(i=1;i<=len;i++) 
+          printf (i/len <= loaded/total) ? ">" : "."; 
+      printf int(loaded/total*100) "% " loaded "/" total "\r" ;
+    }
+    trace { # in error tracing
+      print;
+      next;
+    } 
+    /Loading module .*\([0-9]+/ {
+      split($10, data, "[/)(]") 
+      if (start == 0) # if this is the first report, set the starting point
+        start=data[2];
+      loaded = data[2]-start 
+      total = data[3]-start
+      for(i=1;i<=len;i++) # print progress bar
+          printf (i/len <= loaded/total) ? ">" : "."; 
+      printf int(loaded/total*100) "% " loaded "/" total "\r" ;
+    } 
+    END { 
+      printf "\n";  
+    } 
+    '
+  echo "Exited with error code: ${PIPESTATUS[0]}${pipestatus[1]}"
 }
 
 function o-test() {
 ### test-tags : runs tests and exit
-  $ODOO_BIN `o-get-args` --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=info --test-tags $1 2>&1 | awk '
-    /Starting/ {for(i=7;i<=NF;i++) printf $i " "; printf "\n" } /ERROR/ {trace=1;next} /INFO|ERROR/ {trace=0}trace
-    ' ; echo ${PIPESTATUS[0]}${pipestatus[1]} 
-    #second pipestatus is for zsh
+  $ODOO_BIN `o-get-args` --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $1 2>&1 | awk '
+    /Starting/ {for(i=7;i<=NF;i++) printf $i " "; printf "\n" } 
+    /(CRITICAL|ERROR|WARNING)/ {trace=1;next} 
+    /(INFO|WARNING|ERROR|CRITICAL)/ {trace=0}trace
+    ' 
+  echo "Exited with error code: ${PIPESTATUS[0]}${pipestatus[1]}"
+  #second pipestatus is for zsh
 }
 
 function o-backup() {
@@ -294,7 +361,7 @@ function o-trans-export() {
 if [ "$1" == "-i" ]; then
   shift
   mpath=$(o-module-path $1)
-  [ -z $mpath ] && exit 3
+  [ -z $mpath ] && unset mpath; return 3
 fi
 echo "Extracting${mpath+and replacing original file}..."
 args=`o-get-args`
@@ -307,7 +374,7 @@ function o-trans-update() {
 ### module: exports a new pot file and upgrade all po files to match it. Overwrites the original files!
 module=$1
 mpath=$(o-module-path $module)
-[ -z $mpath ] && exit 3
+[ -z $mpath ] && unset mpath; return 3
 echo "Extracting current terms to $mpath/i18n/$module.pot..."
 o-trans-export -i $module
 # pushd $mpath/i18n/
