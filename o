@@ -177,6 +177,13 @@ function o-venv() {
     unset git branch main_branch
     return 77
   fi
+  if [ ! -f $ODOO_ROOT/.venvs/$main_branch/bin/python ]; then
+    echo "venv not found for this the branch $main_branch, creating one in $ODOO_ROOT/.venvs/$main_branch/"
+    python -m venv $ODOO_ROOT/.venvs/$main_branch/
+    . $ODOO_ROOT/.venvs/$main_branch/bin/activate
+    echo "Installing requirements..."
+    python -m pip install -r <($git show $main_branch:requirements.txt)
+  fi
   . $ODOO_ROOT/.venvs/$main_branch/bin/activate
   unset git branch main_branch
 }
