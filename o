@@ -285,7 +285,7 @@ function o-sync-to-com() {
 
 function o-bin() {
 ### [params]: runs odoo
-  $ODOO_BIN `o-get-args` $*
+  $ODOO_BIN $* `o-get-args` 
 }
 
 function o-shell() {
@@ -294,7 +294,38 @@ function o-shell() {
 }
 
 function o-upgrade() {
-### module1[,mudule2,...] : upgrades selected modules and exits
+### [-v] module1[,mudule2,...] : upgrades selected modules and exits, with -v the info log are not suppressed
+  if [ "$1" == "-v" ]; then
+  $ODOO_BIN `o-get-args` -u $2 --st --log-level info 2>&1 | awk '
+  BEGIN {
+      start=0; 
+      len=80; # progressbar length
+      total=1; # prevent division by zero
+      for(i=1;i<=len;i++) # init progressbar
+        printf "."; 
+      printf "\r" 
+    }
+  /Loading module .*\([0-9]+/ {
+      split($10, data, "[/)(]") 
+      if (start == 0) # if this is the first report, set the starting point
+        start=data[2];
+      loaded = data[2]-start 
+      total = data[3]-start
+      }
+  // {
+    # erase progress bar
+    for(i=1;i<=len;i++) # init progressbar
+        printf " "; 
+      printf "\r" 
+    # output
+    print
+    #redraw progress bar
+    for(i=1;i<=len;i++) 
+          printf (i/len <= loaded/total) ? ">" : "."; 
+      printf int(loaded/total*100) "% " loaded "/" total "\r" ;
+  }
+  '
+  else 
   $ODOO_BIN `o-get-args` -u $1 --st --log-level info 2>&1 | awk '
     BEGIN {
       start=0; 
@@ -308,7 +339,9 @@ function o-upgrade() {
     /(CRITICAL|ERROR|WARNING)/ {
       trace=1; # error detected
       # erase progress bar
-      printf "                                                                                          \n"; 
+      for(i=1;i<=len;i++)
+        printf " "
+      printf"\r"; 
     } 
     /(INFO)/ {
       trace=0 # end of error
@@ -318,7 +351,7 @@ function o-upgrade() {
       printf int(loaded/total*100) "% " loaded "/" total "\r" ;
     }
     trace { # in error tracing
-      print;
+      printf $0 "\n";
       next;
     } 
     /Loading module .*\([0-9]+/ {
@@ -335,6 +368,7 @@ function o-upgrade() {
       printf "\n";  
     } 
     '
+  fi
   echo "Exited with error code: ${PIPESTATUS[0]}${pipestatus[1]}"
 }
 
