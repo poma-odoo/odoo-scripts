@@ -383,6 +383,12 @@ function o-test() {
   #second pipestatus is for zsh
 }
 
+function o-drop() {
+### : kills odoo and drops active db
+pkill -f odoo-bin
+dropdb `o-branch`
+
+}
 function o-backup() {
 ### : copies current database to a temporary dbname-backup
 createdb -T `o-branch` `o-branch`-backup
@@ -390,9 +396,7 @@ createdb -T `o-branch` `o-branch`-backup
 
 function o-restore() {
 ### : erase current db and retore backup taken with o-backup
-args=`o-get-args`
-pgrep -f odoo-bin
-dropdb `o-branch`
+o-drop
 createdb -T `o-branch`-backup `o-branch`
 }
 
