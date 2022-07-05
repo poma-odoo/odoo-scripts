@@ -193,8 +193,8 @@ function o-get-args() {
   [ -f $HOME/.odoorc ] && odoo_args="-c $HOME/.odoorc"
   [ -f $ODOO_ROOT/.odoorc ] && odoo_args="-c $ODOO_ROOT/.odoorc"
   [ -f $ODOO_ROOT/odoorc ] && odoo_args="-c $ODOO_ROOT/odoorc"
-  [ -z "$odoo_args" ] && odoo_args="--addons-path=$ODOO_ROOT/odoo/odoo/addons,$ODOO_ROOT/odoo/addons,$ODOO_ROOT/enterprise -d $(o-branch) --limit-time-cpu=99999999 --limit-time-real=99999999 --limit-memory-soft=17179869184 --limit-memory-hard=17179869184"
-  echo $odoo_args
+  [ -z "$odoo_args" ] && odoo_args="--addons-path=$ODOO_ROOT/odoo/odoo/addons,$ODOO_ROOT/odoo/addons,$ODOO_ROOT/enterprise --limit-time-cpu=99999999 --limit-time-real=99999999 --limit-memory-soft=17179869184 --limit-memory-hard=17179869184"
+  echo $odoo_args -d `o-branch`
   unset odoo_args
 }
 
