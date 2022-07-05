@@ -319,9 +319,7 @@ function o-upgrade() {
       }
   // {
     # erase progress bar
-    for(i=1;i<=len;i++) # init progressbar
-        printf " "; 
-      printf "\r" 
+      printf "\r\033[K" 
     # output
     print
     #redraw progress bar
@@ -344,9 +342,7 @@ function o-upgrade() {
     /(CRITICAL|ERROR|WARNING)/ {
       trace=1; # error detected
       # erase progress bar
-      for(i=1;i<=len;i++)
-        printf " "
-      printf"\r"; 
+      printf"\r\033[K"; 
     } 
     /(INFO)/ {
       trace=0 # end of error
@@ -378,12 +374,76 @@ function o-upgrade() {
 }
 
 function o-test() {
-### test-tags : runs tests and exit
-  o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $1 2>&1 | awk '
-    /Starting/ {for(i=7;i<=NF;i++) printf $i " "; printf "\n" } 
-    /(CRITICAL|ERROR|WARNING)/ {trace=1;next} 
-    /(INFO|WARNING|ERROR|CRITICAL)/ {trace=0}trace
-    ' 
+### [-v|-q] test-tags : runs tests and exit, -v verbose, no post processing, -q show firstline trace of failed tests only
+  if [ "$1" == "-v" ]; then
+    o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $2
+  elif [ "$1" == "-q" ]; then
+  o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $2 2>&1 | awk '
+      BEGIN {count=0;}
+      /Starting/ {
+        test=""; 
+        for(i=8;i<NF;i++) 
+          test = test $i " "; 
+        if (test=="post ")
+          printf "\nStarting post tests...\n" ;
+        else {
+          count++; 
+          printf "\rStarting " count ":" test "...\033[K";
+        }
+      } 
+      /(INFO|WARNING|ERROR|CRITICAL)/ {lookup=1;}
+      /File "/ {
+        if (lookup) {
+          trace=2; 
+          fails[count]= test;
+          printf "\r Test " count ":" test "\033[41;37mFAILED\033[0m\n";
+          lookup=0;
+        }
+      } 
+      trace {print; trace--}
+      END { 
+        errors=0;
+        printf "\r\033[K"
+        printf "-----------\n";
+        for (i in fails){ 
+          printf "\033[41;37mFAILED\033[0m Test " i " :" fails[i] "\n";
+          errors++;
+          }
+        if (errors>0)
+          printf errors " tests \033[41;37mFAILED\033[0m of ";
+        printf "total " count " tests done\n";
+      }
+      ' 
+  else
+    o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $1 2>&1 | awk '
+      BEGIN {count=0}
+      /Starting/ {
+        test=""; 
+        for(i=8;i<NF;i++) 
+          test = test $i " "; 
+        if (test=="post ")
+          print "Starting post tests..." ;
+        else {
+          count++; 
+          printf "Starting " count ":" test "...\n";
+        }
+      } 
+      /(CRITICAL|ERROR|WARNING)/ {trace=1; print; fails[count]= count test; next;} 
+      /(INFO|WARNING|ERROR|CRITICAL)/ {trace=0}
+      trace
+      END { 
+        errors=0;
+        printf "-----------\n";
+        for (i in fails){ 
+          printf "\033[41;37mFAILED\033[0m Test " i " :" fails[i] "\n";
+          errors++;
+          }
+        if (i>0)
+          printf i " tests \033[41;37mFAILED\033[0m of ";
+        printf "total " count " tests done\n";
+      }
+      ' 
+  fi
   echo "Exited with error code: ${PIPESTATUS[0]}${pipestatus[1]}"
   #second pipestatus is for zsh
 }
