@@ -385,10 +385,10 @@ function o-test() {
         for(i=8;i<NF;i++) 
           test = test $i " "; 
         if (test=="post ")
-          printf "\nStarting post tests...\n" ;
+          printf "\rStarting post tests...\033[K" ;
         else {
           count++; 
-          printf "\rStarting " count ":" test "...\033[K";
+          printf "\rStarting " count ":" test "\b...\033[K";
         }
       } 
       /(INFO|WARNING|ERROR|CRITICAL)/ {lookup=1;}
@@ -401,17 +401,10 @@ function o-test() {
         }
       } 
       trace {print; trace--}
+      /^odoo\.exceptions/ {print}
+      /^psycopg2\./
       END { 
-        errors=0;
-        printf "\r\033[K"
-        printf "-----------\n";
-        for (i in fails){ 
-          printf "\033[41;37mFAILED\033[0m Test " i " :" fails[i] "\n";
-          errors++;
-          }
-        if (errors>0)
-          printf errors " tests \033[41;37mFAILED\033[0m of ";
-        printf "total " count " tests done\n";
+        printf "\r\033[Ktotal of " count " tests done\n";
       }
       ' 
   else
@@ -422,14 +415,18 @@ function o-test() {
         for(i=8;i<NF;i++) 
           test = test $i " "; 
         if (test=="post ")
-          print "Starting post tests..." ;
+          printf "\rStarting post tests...\033[K" ;
         else {
           count++; 
-          printf "Starting " count ":" test "...\n";
+          printf "\rStarting " count ":" test "\b...\033[K";
         }
       } 
-      /(CRITICAL|ERROR|WARNING)/ {trace=1; print; fails[count]= count test; next;} 
-      /(INFO|WARNING|ERROR|CRITICAL)/ {trace=0}
+      /(CRITICAL|ERROR|WARNING)/ {
+        printf "\r Test " count ":" test "\033[41;37mFAILED\033[0m\n";
+        trace=1; 
+        fails[count]= test; 
+      } 
+      /INFO/ {trace=0}
       trace
       END { 
         errors=0;
@@ -438,9 +435,9 @@ function o-test() {
           printf "\033[41;37mFAILED\033[0m Test " i " :" fails[i] "\n";
           errors++;
           }
-        if (i>0)
-          printf i " tests \033[41;37mFAILED\033[0m of ";
-        printf "total " count " tests done\n";
+        if (errors>0)
+          printf errors " tests \033[41;37mFAILED\033[0m of ";
+        printf "total of" count " tests done\n";
       }
       ' 
   fi
