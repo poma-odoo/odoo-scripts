@@ -22,7 +22,7 @@ user_email=$(git -C  $ODOO_ROOT/odoo config user.email)
 user_email=${user_email,,}
 readonly ODOO_XGRAM=${user_email%%@*}
 
-# private functions
+# private functions (no bashrc, no auto help)
 function  get_shell_rc() {
 if [[ $SHELL = *zsh ]]; then
   echo "$HOME/.zshrc"
@@ -290,13 +290,18 @@ function o-bin() {
 
 function o-shell() {
 ### [params]: runs shell
-  $ODOO_BIN shell `o-get-args` $*
+  o-bin shell $*
+}
+
+function o-init() {
+### [module1,module2,...] : initilize modules and exit, if no modules given, it installs l10n_generic_coa
+  o-bin -i ${1-l10n_generic_coa} --st
 }
 
 function o-upgrade() {
 ### [-v] module1[,mudule2,...] : upgrades selected modules and exits, with -v the info log are not suppressed
   if [ "$1" == "-v" ]; then
-  $ODOO_BIN `o-get-args` -u $2 --st --log-level info 2>&1 | awk '
+  o-bin -u $2 --st --log-level info 2>&1 | awk '
   BEGIN {
       start=0; 
       len=80; # progressbar length
@@ -326,7 +331,7 @@ function o-upgrade() {
   }
   '
   else 
-  $ODOO_BIN `o-get-args` -u $1 --st --log-level info 2>&1 | awk '
+  o-bin -u $1 --st --log-level info 2>&1 | awk '
     BEGIN {
       start=0; 
       trace=0; 
@@ -374,7 +379,7 @@ function o-upgrade() {
 
 function o-test() {
 ### test-tags : runs tests and exit
-  $ODOO_BIN `o-get-args` --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $1 2>&1 | awk '
+  o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $1 2>&1 | awk '
     /Starting/ {for(i=7;i<=NF;i++) printf $i " "; printf "\n" } 
     /(CRITICAL|ERROR|WARNING)/ {trace=1;next} 
     /(INFO|WARNING|ERROR|CRITICAL)/ {trace=0}trace
@@ -383,12 +388,16 @@ function o-test() {
   #second pipestatus is for zsh
 }
 
-function o-drop() {
-### : kills odoo and drops active db
-pkill -f odoo-bin
-dropdb `o-branch`
-
+function o-psql() {
+### : launches psql on current db
+psql `o-branch`
 }
+
+function o-drop() {
+### : drops active db
+dropdb -f `o-branch`
+}
+
 function o-backup() {
 ### : copies current database to a temporary dbname-backup
 createdb -T `o-branch` `o-branch`-backup
@@ -409,10 +418,9 @@ if [ "$1" == "-i" ]; then
   [ -z $mpath ] && unset mpath; return 3
 fi
 echo "Extracting${mpath+and replacing original file}..."
-args=`o-get-args`
-[ -z "$2" ] && $ODOO_BIN $args -d $(o-branch) -i ${1:?"module name is required"} --i18n-export ${mpath+$mpath/i18n/}$1.pot --modules $1 --st --log-level=error
-[ -n "$2" ] && $ODOO_BIN $args -d $(o-branch) --i18n-export ${mpath+$mpath/i18n/}$2.po --modules $1 --load-language $2 --language $2 --st --log-level=error
-unset mpath args
+[ -z "$2" ] && o-bin -d $(o-branch) -i ${1:?"module name is required"} --i18n-export ${mpath+$mpath/i18n/}$1.pot --modules $1 --st --log-level=error
+[ -n "$2" ] && o-bin -d $(o-branch) --i18n-export ${mpath+$mpath/i18n/}$2.po --modules $1 --load-language $2 --language $2 --st --log-level=error
+unset mpath 
 }
 
 function o-trans-update() {
