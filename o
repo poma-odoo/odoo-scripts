@@ -413,7 +413,7 @@ function o-test() {
   shift
   o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $* 2>&1 | awk '
       BEGIN {count=0;}
-      /Starting/ {
+      /Starting Test/ {
         test=""; 
         for(i=8;i<NF;i++) 
           test = test $i " "; 
@@ -447,7 +447,7 @@ function o-test() {
   else
     o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $* 2>&1 | awk '
       BEGIN {count=0}
-      /Starting/ {
+      /Starting Test/ {
         test=""; 
         for(i=8;i<NF;i++) 
           test = test $i " "; 
