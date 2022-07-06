@@ -295,7 +295,7 @@ function o-shell() {
 
 function o-init() {
 ### [module1,module2,...] : initilize modules and exit, if no modules given, it installs l10n_generic_coa
-  o-bin -i ${1-l10n_generic_coa} --st
+  o-bin -i ${1-l10n_generic_coa} --st --log-level info
 }
 
 function o-upgrade() {
@@ -376,9 +376,11 @@ function o-upgrade() {
 function o-test() {
 ### [-v|-q] test-tags : runs tests and exit, -v verbose, no post processing, -q show firstline trace of failed tests only
   if [ "$1" == "-v" ]; then
-    o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $2
+  shift
+    o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $*
   elif [ "$1" == "-q" ]; then
-  o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $2 2>&1 | awk '
+  shift
+  o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $* 2>&1 | awk '
       BEGIN {count=0;}
       /Starting/ {
         test=""; 
@@ -408,7 +410,7 @@ function o-test() {
       }
       ' 
   else
-    o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $1 2>&1 | awk '
+    o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $* 2>&1 | awk '
       BEGIN {count=0}
       /Starting/ {
         test=""; 
