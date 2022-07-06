@@ -293,15 +293,8 @@ function o-shell() {
   o-bin shell $*
 }
 
-function o-init() {
-### [module1,module2,...] : initilize modules and exit, if no modules given, it installs l10n_generic_coa
-  o-bin -i ${1-l10n_generic_coa} --st --log-level info
-}
-
-function o-upgrade() {
-### [-v] module1[,mudule2,...] : upgrades selected modules and exits, with -v the info log are not suppressed
-  if [ "$1" == "-v" ]; then
-  o-bin -u $2 --st --log-level info 2>&1 | awk '
+function _o_init_updgrade_progressbar_verbose() {
+  o-bin $* --st --log-level info 2>&1 | awk '
   BEGIN {
       start=0; 
       len=80; # progressbar length
@@ -328,8 +321,16 @@ function o-upgrade() {
       printf int(loaded/total*100) "% " loaded "/" total "\r" ;
   }
   '
-  else 
-  o-bin -u $1 --st --log-level info 2>&1 | awk '
+  code=${PIPESTATUS[0]}${pipestatus[1]}
+  if [ $code -eq 0 ]; then 
+    echo "Operation successful"
+  else
+    echo "Exited with error code: $code"
+  fi
+  unset code
+}
+function _o_init_updgrade_progressbar_() {
+  o-bin $* --st --log-level info 2>&1 | awk '
     BEGIN {
       start=0; 
       trace=0; 
@@ -363,14 +364,44 @@ function o-upgrade() {
       total = data[3]-start
       for(i=1;i<=len;i++) # print progress bar
           printf (i/len <= loaded/total) ? ">" : "."; 
-      printf int(loaded/total*100) "% " loaded "/" total "\r" ;
+      printf int(loaded/total*100) "% " loaded "/" total " : " $9 "\033[K\r";
     } 
     END { 
       printf "\n";  
     } 
     '
+  code=${PIPESTATUS[0]}${pipestatus[1]}
+  if [ $code -eq 0 ]; then 
+    echo "Operation successful"
+  else
+    echo "Exited with error code: $code"
   fi
-  echo "Exited with error code: ${PIPESTATUS[0]}${pipestatus[1]}"
+  unset code
+}
+
+function o-init() {
+### [-v] [module1,module2,...] : initilize modules and exit, if no modules given, it installs l10n_generic_coa with -v the info log are not suppressed
+  if [ "$1" == "-v" ]; then
+  shift
+  modules=${1-l10n_generic_coa}
+  shift
+  _o_init_updgrade_progressbar_verbose -i $modules $*
+  else
+  modules=${1-l10n_generic_coa}
+  shift
+  _o_init_updgrade_progressbar_ -u $modules $*
+  fi
+  unset modules
+}
+
+function o-upgrade() {
+### [-v] [module1,mudule2,...] : upgrades selected modules or all if no module provided and exits, with -v the info log are not suppressed
+  if [ "$1" == "-v" ]; then
+  shift
+  _o_init_updgrade_progressbar_verbose -u $*
+  else
+  _o_init_updgrade_progressbar_ -u $*
+  fi
 }
 
 function o-test() {
