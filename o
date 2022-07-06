@@ -61,7 +61,7 @@ function install() {
   o-help >>$RCFILE
   echo "EOF">>$RCFILE
   echo "}">>$RCFILE
-  echo "Setting up for odoo sources in  ODOO_ROOT"
+  echo "Setting up for odoo sources in $ODOO_ROOT"
   sed -n '/^#dodoo commands$/,/^#dodoo end$/p' $0 >> $RCFILE
   echo "use 'source $RCFILE' or open a new terminal and enjoy!"
   echo 'Type `o-help` to get help.'
@@ -321,13 +321,8 @@ function _o_init_updgrade_progressbar_verbose() {
       printf int(loaded/total*100) "% " loaded "/" total "\r" ;
   }
   '
-  code=${PIPESTATUS[0]}${pipestatus[1]}
-  if [ $code -eq 0 ]; then 
-    echo "Operation successful"
-  else
-    echo "Exited with error code: $code"
-  fi
-  unset code
+  return ${PIPESTATUS[0]}${pipestatus[1]}
+  
 }
 function _o_init_updgrade_progressbar_() {
   o-bin $* --st --log-level info 2>&1 | awk '
@@ -370,27 +365,28 @@ function _o_init_updgrade_progressbar_() {
       printf "\n";  
     } 
     '
-  code=${PIPESTATUS[0]}${pipestatus[1]}
+  return ${PIPESTATUS[0]}${pipestatus[1]}
+}
+
+function o-init() {
+### [-v] [module1,module2,...] : initilize modules and exit, if no modules given, it installs l10n_generic_coa with -v the info log are not suppressed
+  if [ "$1" == "-v" ]; then
+    shift
+    modules=${1-l10n_generic_coa}
+    shift
+    _o_init_updgrade_progressbar_verbose -i $modules $*
+  else
+    modules=${1-l10n_generic_coa}
+    shift
+    _o_init_updgrade_progressbar_ -u $modules $*
+  fi
+  code=$?
   if [ $code -eq 0 ]; then 
     echo "Operation successful"
   else
     echo "Exited with error code: $code"
   fi
   unset code
-}
-
-function o-init() {
-### [-v] [module1,module2,...] : initilize modules and exit, if no modules given, it installs l10n_generic_coa with -v the info log are not suppressed
-  if [ "$1" == "-v" ]; then
-  shift
-  modules=${1-l10n_generic_coa}
-  shift
-  _o_init_updgrade_progressbar_verbose -i $modules $*
-  else
-  modules=${1-l10n_generic_coa}
-  shift
-  _o_init_updgrade_progressbar_ -u $modules $*
-  fi
   unset modules
 }
 
