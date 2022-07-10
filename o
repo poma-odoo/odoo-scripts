@@ -307,12 +307,12 @@ function _o_init_updgrade_progressbar_verbose() {
       split($10, data, "[/)(]") 
       if (start == 0) # if this is the first report, set the starting point
         start=data[2];
-      if (data[2]==data[3]) # in init we have sepparate counters
-        start=0;
-      }
       loaded = data[2]-start;
       total = data[3]-start;
       total = total ? total : 1;
+      if (data[2]==data[3]) # in init we have sepparate counters
+        start=0;
+      }
   // {
     # erase progress bar
       printf "\r\033[K" 
@@ -358,14 +358,14 @@ function _o_init_updgrade_progressbar_() {
       split($10, data, "[/)(]");
       if (start == 0) # if this is the first report, set the starting point
         start=data[2];
-      if (data[2]==data[3]) # in init we have sepparate counters
-        start=0;
       loaded = data[2]-start ;
       total = data[3]-start;
       total = total ? total : 1;
       for(i=1;i<=len;i++) # print progress bar
           printf (i/len <= loaded/total) ? ">" : "."; 
       printf int(loaded/total*100) "% " loaded "/" total " : " $9 "\033[K\r";
+      if (data[2]==data[3]) # in init we have sepparate counters
+        start=0;
     } 
     END { 
       printf "\n";  
