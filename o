@@ -288,6 +288,11 @@ function o-bin() {
   $ODOO_BIN $* `o-get-args` 
 }
 
+function o-dev() {
+### [params]: runs odoo-bin with --dev=all
+  o-bin --dev=all $*
+}
+
 function o-shell() {
 ### [params]: runs shell
   o-bin shell $*
