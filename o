@@ -412,13 +412,37 @@ function o-upgrade() {
 }
 
 function o-test() {
-### [-v|-q] test-tags : runs tests and exit, -v verbose, no post processing, -q show firstline trace of failed tests only
+### [-a|-e|-c] [-v|-q] test-tags : runs tests and exit, -a,-e,-c: all,enterprise,comunity, -v verbose, no post processing, -q show firstline trace of failed tests only
+  args="--max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test "
+
+  if [ "$1" == "-a" ]; then
+    shift
+  elif [ "$1" == "-c" ]; then
+    shift
+    args="$args --test-tags "
+    pushd $ODOO_ROOT/odoo/addons
+    for module in *; do
+      args="${args}$module,"
+    done
+    popd
+  elif [ "$1" == "-e" ]; then
+    shift
+    args="$args --test-tags "
+    pushd $ODOO_ROOT/enterprise
+    for module in *; do
+      args="${args}$module,"
+    done
+    popd
+  else
+    args="$args --test-tags $*"
+  fi
+
   if [ "$1" == "-v" ]; then
-  shift
-    o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $*
+    shift
+    o-bin $args
   elif [ "$1" == "-q" ]; then
-  shift
-  o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $* 2>&1 | awk '
+    shift
+    o-bin $args 2>&1 | awk '
       BEGIN {count=0;}
       /Starting Test/ {
         test=""; 
@@ -452,7 +476,7 @@ function o-test() {
       }
       ' 
   else
-    o-bin --max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test --test-tags $* 2>&1 | awk '
+    o-bin $args 2>&1 | awk '
       BEGIN {count=0}
       /Starting Test/ {
         test=""; 
@@ -491,6 +515,7 @@ function o-test() {
   fi
   echo "Exited with error code: ${PIPESTATUS[0]}${pipestatus[1]}"
   #second pipestatus is for zsh
+  unset args
 }
 
 function o-psql() {
