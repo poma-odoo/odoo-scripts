@@ -305,6 +305,11 @@ function o-shell() {
   o-bin shell $*
 }
 
+function o-kill() {
+### : kills all odoo instances
+  pkill -f $ODOO_BIN
+}
+
 function _o_init_updgrade_progressbar_verbose() {
   o-bin $* --st --log-level info 2>&1 | awk '
   BEGIN {
