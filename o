@@ -7,7 +7,7 @@ set -e
 readonly ODOO_REPOS="odoo enterprise upgrade documents"
 
 if [ "$1" != "clone" ]; then 
-  readonly ODOO_ROOT=$(
+  [ -z "$ODOO_BRANCHES" ] && readonly ODOO_ROOT=$(
     ( test -d "$HOME/git/odoo/odoo/.git" && echo "$HOME/git/odoo" ) ||\
     ( test -d "$HOME/src/odoo/.git" && echo "$HOME/src" ) ||\
     ( find "$HOME" -name .git -type d -path '/*/odoo/.git' 2>/dev/null | head -n1 | sed 's#/odoo/.git$##' )
@@ -48,7 +48,7 @@ function o-help() {
 }
 
 function install() {
-  ### [-n]: Adds o-Commands to bashrc/zsh, -n means do not update main branches from runbot acive branches
+### [-n]: Adds o-Commands to bashrc/zsh, -n means do not update main branches from runbot acive branches
   RCFILE=$(get_shell_rc)
   [ -z "$RCFILE" ] && echo "No compatible shell found, currently only  bash and zsh are supported" >&2 && unset RCFILE && return 2
   [ ! "$1" = "-n" ] && echo "Retriving active main branches..." && readonly ODOO_BRANCHES=$(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
@@ -531,11 +531,12 @@ psql `o-branch`
 
 function o-drop() {
 ### : drops active db
-dropdb -f `o-branch`
+dropdb -f --if-exists `o-branch`
 }
 
 function o-backup() {
-### : copies current database to a temporary dbname-backup
+### : copies current database to a temporary dbname-backup, overrights the backup
+dropdb -f --if-exists `o-branch`-backup
 createdb -T `o-branch` `o-branch`-backup
 }
 
@@ -545,13 +546,29 @@ o-drop
 createdb -T `o-branch`-backup `o-branch`
 }
 
+function o-backup2() {
+### : copies current database to a temporary dbname-backup2, overrights this backup 
+dropdb -f --if-exists `o-branch`-backup2
+createdb -T `o-branch` `o-branch`-backup2
+}
+
+function o-restore2() {
+### : erase current db and retore backup taken with o-backup2
+o-drop
+createdb -T `o-branch`-backup2 `o-branch`
+}
+
 function o-trans-export() {
 ### [-i] module [lang]: installs the module and exports pot, or exports po file for module and selected language. -i means inplace, it overwrite the existing file in module 
 
 if [ "$1" == "-i" ]; then
   shift
   mpath=$(o-module-path $1)
-  [ -z $mpath ] && unset mpath; return 3
+  if [ -z $mpath ]; then
+    echo "Module $1 not found." >&2
+    unset mpath 
+    return 3
+  fi
 fi
 echo "Extracting${mpath+and replacing original file}..."
 [ -z "$2" ] && o-bin -d $(o-branch) -i ${1:?"module name is required"} --i18n-export ${mpath+$mpath/i18n/}$1.pot --modules $1 --st --log-level=error
@@ -598,9 +615,10 @@ else
   echo "syntax: $(basename $0) ${COMMANDS// /|}"
   echo
   echo "clone: clones the repositories and setup git"
-  echo "install: adds o-commands to shell on next start"
+  echo "install [-n]: adds o-commands to shell on next start, -n means do not update main branches from runbot acive branches
+"
   echo "uninstall: removes o-commands from shell on next start"
   echo "update: updates odoo main branches (starred ones in the runbot)"
   o-help
-  echo "all o-* commands can be invoked without 'o-', e.g '$0 branch' is equal to '$0 o-branch'"
+  echo "all o-* commands can be invoked without 'o-', e.g '$(basename $0) branch' is equal to '$(basename $0) o-branch'"
 fi
