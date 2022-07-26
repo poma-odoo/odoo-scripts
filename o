@@ -4,24 +4,30 @@ set -e
 # trap read debug
 
 # setup vars
+readonly ODOO_REPOS="odoo enterprise upgrade documents"
 
-readonly ODOO_ROOT=$(
+if [ "$1" != "clone" ]; then 
+  readonly ODOO_ROOT=$(
     ( test -d "$HOME/git/odoo/odoo/.git" && echo "$HOME/git/odoo" ) ||\
     ( test -d "$HOME/src/odoo/.git" && echo "$HOME/src" ) ||\
     ( find "$HOME" -name .git -type d -path '/*/odoo/.git' 2>/dev/null | head -n1 | sed 's#/odoo/.git$##' )
-    )
-if [ -z  "$ODOO_ROOT" ]; then
-  echo "Odoo root not found in $HOME" >&2
-  return 1
+  )
+  if [ -z  "$ODOO_ROOT" ] && [ "$1" != "clone" ]; then
+    echo "Odoo root not found in $HOME" >&2
+    return 1
+  fi
+  if [ -z "$ODOO_BRANCHES" ]; then
+    echo "Retriving active main branches..."
+    readonly ODOO_BRANCHES=$(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
+  fi
+  readonly ODOO_BIN=$ODOO_ROOT/odoo/odoo-bin
+
+  if [ -n "$ODOO_ROOT" ]; then
+    user_email=$(git -C  $ODOO_ROOT/odoo config user.email)
+    user_email=${user_email,,}
+    readonly ODOO_XGRAM=${user_email%%@*}
+  fi
 fi
-readonly ODOO_REPOS="odoo enterprise upgrade documents"
-[ -z "$ODOO_BRANCHES" ] && echo "Retriving active main branches..." && readonly ODOO_BRANCHES=$(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
-readonly ODOO_BIN=$ODOO_ROOT/odoo/odoo-bin
-
-user_email=$(git -C  $ODOO_ROOT/odoo config user.email)
-user_email=${user_email,,}
-readonly ODOO_XGRAM=${user_email%%@*}
-
 # private functions (no bashrc, no auto help)
 function  get_shell_rc() {
 if [[ $SHELL = *zsh ]]; then
@@ -90,6 +96,7 @@ function clone() {
   ODOO_ROOT=${ODOO_ROOT:-$HOME/src}
   mkdir -p $ODOO_ROOT
 
+  # todo add logic for generating an ssh key (ssh-keygen -t id25519) if none exist
   for repo in $ODOO_REPOS; do
     git clone "git@github.com:odoo/${repo}.git" $ODOO_ROOT/$repo
     git="git -C $ODOO_REPO/$repo"
@@ -179,10 +186,10 @@ function o-venv() {
   fi
   if [ ! -f $ODOO_ROOT/.venvs/$main_branch/bin/python ]; then
     echo "venv not found for this the branch $main_branch, creating one in $ODOO_ROOT/.venvs/$main_branch/"
-    python -m venv $ODOO_ROOT/.venvs/$main_branch/
+    python3 -m venv $ODOO_ROOT/.venvs/$main_branch/
     . $ODOO_ROOT/.venvs/$main_branch/bin/activate
     echo "Installing requirements..."
-    python -m pip install -r <($git show $main_branch:requirements.txt)
+    python3 -m pip install -r <($git show origin/$main_branch:requirements.txt)
   fi
   . $ODOO_ROOT/.venvs/$main_branch/bin/activate
   unset git branch main_branch
@@ -415,34 +422,33 @@ function o-test() {
 ### [-a|-e|-c] [-v|-q] test-tags : runs tests and exit, -a,-e,-c: all,enterprise,comunity, -v verbose, no post processing, -q show firstline trace of failed tests only
   args="--max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test "
 
-  if [ "$1" == "-a" ]; then
-    shift
-  elif [ "$1" == "-c" ]; then
-    shift
+  if [ "$1" == "-c" ] || [ "$1" == "-a" ];  then
     args="$args --test-tags "
     pushd $ODOO_ROOT/odoo/addons
     for module in *; do
       args="${args}$module,"
     done
     popd
-  elif [ "$1" == "-e" ]; then
-    shift
+    test_repos=1
+  fi
+  if [ "$1" == "-e" ] || [ "$1" == "-a" ]; then
     args="$args --test-tags "
     pushd $ODOO_ROOT/enterprise
     for module in *; do
       args="${args}$module,"
     done
     popd
-  else
-    args="$args --test-tags $*"
+    test_repos=1
   fi
-
+	
+  [ -n "$test_repos" ] && shift
+  [ -z "$test_repos" ] && args="$args --test-tags "
   if [ "$1" == "-v" ]; then
     shift
-    o-bin $args
+    o-bin $args $*
   elif [ "$1" == "-q" ]; then
     shift
-    o-bin $args 2>&1 | awk '
+    o-bin $args $* 2>&1 | awk '
       BEGIN {count=0;}
       /Starting Test/ {
         test=""; 
@@ -476,7 +482,7 @@ function o-test() {
       }
       ' 
   else
-    o-bin $args 2>&1 | awk '
+    o-bin $args $* 2>&1 | awk '
       BEGIN {count=0}
       /Starting Test/ {
         test=""; 
