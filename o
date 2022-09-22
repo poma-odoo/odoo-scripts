@@ -189,7 +189,7 @@ function o-venv() {
     python3 -m venv $ODOO_ROOT/.venvs/$main_branch/
     . $ODOO_ROOT/.venvs/$main_branch/bin/activate
     echo "Installing requirements..."
-    python3 -m pip install -r <($git show origin/$main_branch:requirements.txt)
+    $ODOO_ROOT/.venvs/$main_branch/bin/python -m pip install -r <($git show $main_branch:requirements.txt)
   fi
   . $ODOO_ROOT/.venvs/$main_branch/bin/activate
   unset git branch main_branch
@@ -307,7 +307,7 @@ function o-shell() {
 
 function o-kill() {
 ### : kills all odoo instances
-  pkill -f $ODOO_BIN
+  pkill -f $ODOO_BIN || true
 }
 
 function _o_init_updgrade_progressbar_verbose() {
@@ -424,10 +424,14 @@ function o-upgrade() {
 }
 
 function o-test() {
-### [-a|-e|-c] [-v|-q] test-tags : runs tests and exit, -a,-e,-c: all,enterprise,comunity, -v verbose, no post processing, -q show firstline trace of failed tests only
+### [-a|-e|-c] [-v|-vv|-q] test-tags : runs tests and exit, -a,-e,-c: all,enterprise,comunity, -v verbose, no post processing, -q show firstline trace of failed tests only
   args="--max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test "
-
-  if [ "$1" == "-c" ] || [ "$1" == "-a" ];  then
+  
+  scope=$1
+  if [ "$1" == "-a" ]; then
+    shift
+  elif [ "$1" == "-c" ]; then
+    shift
     args="$args --test-tags "
     pushd $ODOO_ROOT/odoo/addons
     for module in *; do
@@ -443,12 +447,14 @@ function o-test() {
       args="${args}$module,"
     done
     popd
-    test_repos=1
+  else
+    args="$args --test-tags "
   fi
-	
-  [ -n "$test_repos" ] && shift
-  [ -z "$test_repos" ] && args="$args --test-tags "
-  if [ "$1" == "-v" ]; then
+
+  if [ "$1" == "-vv" ]; then
+    shift
+    o-bin $args --log-level=debug  $*
+  elif [ "$1" == "-v" ]; then
     shift
     o-bin $args $*
   elif [ "$1" == "-q" ]; then
