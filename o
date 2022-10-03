@@ -223,10 +223,10 @@ done
 }
 
 function o-rebase-all() {
-### : rebase active branches to their latest version of main branches, for 15.0-z-y, it pulls 15.0 an rebases active branch to it
+### [branch] : rebase provided branch to their latest version of main branches on all repos, for 15.0-z-y, it pulls 15.0 an rebases the branch onto it. Uses current branch if none given 
   for repo in $ODOO_REPOS; do
     git="git -C $ODOO_ROOT/$repo"
-    branch=$($git branch --show-current)
+    branch=${1:-$($git branch --show-current)}
     main_branch=${branch%%-*}
     if [[ ! $ODOO_BRANCHES =~ $main_branch ]]; then
       echo "Wrong branch name, branch name should begin with one of [ $ODOO_BRANCHES ] and a dash (-) e.g. master-xxx-yyy" >&2
@@ -240,11 +240,12 @@ function o-rebase-all() {
       return 88
     fi
     echo "Rebasing $repo/$branch onto $repo/$branch..."
-    if ! $git rebase $main_branch; then
+    if ! $git rebase $main_branch $branch; then
       echo "Rebasing $repo/$branch onto $main_branch failed." >&2
       unset git branch main_branch
       return 99
     fi
+    [ -n "$1" ] && $git switch -
   done
   unset git branch main_branch
 }
