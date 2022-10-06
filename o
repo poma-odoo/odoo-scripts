@@ -308,7 +308,8 @@ function o-shell() {
 
 function o-kill() {
 ### : kills all odoo instances
-  pkill -f $ODOO_BIN || true
+  [ -x "$(command -v pkill)" ] && pkill -f $ODOO_BIN || true
+  [ -x "$(command -v lsof)" ] && kill -9 $(lsof -i4:8069 -sTCP:LISTEN -Fp | cut -c2-)
 }
 
 function _o_init_updgrade_progressbar_verbose() {
