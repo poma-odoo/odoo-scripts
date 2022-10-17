@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
-set -e
+set -ex
 # trap read debug
+
+function _retrive_branches() {
+	### : updates odoo main branches (starred ones in the runbot) in current session (use $-1 install to make a permanent one) 
+echo $(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a1 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
+}
 
 # setup vars
 readonly ODOO_REPOS="odoo enterprise upgrade documents"
@@ -16,9 +21,9 @@ if [ "$1" != "clone" ]; then
     echo "Odoo root not found in $HOME" >&2
     return 1
   fi
-  if [ -z "$ODOO_BRANCHES" ]; then
-    echo "Retriving active main branches..."
-    readonly ODOO_BRANCHES=$(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
+  if [ -z "$ODOO_BRANCHES" ] && [ "$1" != "install" ]; then
+    echo "Retriving active main branches..." 
+    readonly ODOO_BRANCHES=$(_retrive_branches)
   fi
   readonly ODOO_BIN=$ODOO_ROOT/odoo/odoo-bin
 
@@ -51,7 +56,7 @@ function install() {
 ### [-n]: Adds o-Commands to bashrc/zsh, -n means do not update main branches from runbot acive branches
   RCFILE=$(get_shell_rc)
   [ -z "$RCFILE" ] && echo "No compatible shell found, currently only  bash and zsh are supported" >&2 && unset RCFILE && return 2
-  [ ! "$1" = "-n" ] && echo "Retriving active main branches..." && readonly ODOO_BRANCHES=$(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
+  if [ ! "$1" = "-n" ] || [ -z "$ODOO_BRANCHES" ]; then ODOO_BRANCHES=$(_retrive_branches); fi
   counter=0
   while [ -f $RCFILE.obak$counter ]; do counter=$(expr $counter + 1); done 
   cp $RCFILE $RCFILE.obak$counter
@@ -71,10 +76,6 @@ function install() {
   sed -n '/^#dodoo commands$/,/^#dodoo end$/p' $0 >> $RCFILE
   echo "use 'source $RCFILE' or open a new terminal and enjoy!"
   echo 'Type `o-help` to get help.'
-}
-function update() {
-### : updates odoo main branches (starred ones in the runbot)
-install
 }
 
 function uninstall() {
