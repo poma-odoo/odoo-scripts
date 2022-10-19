@@ -5,7 +5,7 @@ set -ex
 
 function _retrive_branches() {
 	### : updates odoo main branches (starred ones in the runbot) in current session (use $-1 install to make a permanent one) 
-echo $(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a1 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
+echo $(curl -SslL  https://runbot.odoo.com | grep "fa-star" -a2 | grep "<b>" | sed -e "s#\s*<b>##" -e "s#</b>##") 
 }
 
 # setup vars
