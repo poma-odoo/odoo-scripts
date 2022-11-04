@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -ex
+set -e
 # trap read debug
 
 function _retrive_branches() {
@@ -187,9 +187,16 @@ function o-venv() {
   fi
   if [ ! -f $ODOO_ROOT/.venvs/$main_branch/bin/python ]; then
     echo "venv not found for this the branch $main_branch, creating one in $ODOO_ROOT/.venvs/$main_branch/"
-    python3 -m venv $ODOO_ROOT/.venvs/$main_branch/
+    py3=python3
+    [ "$main_branch" = "13.0" ] && py3=python3.7
+    [ "$main_branch" = "14.0" ] && py3=python3.7
+    [ "$main_branch" = "15.0" ] && py3=python3.9
+    [ "$main_branch" = "16.0" ] && py3=python3.9
+
+    $py3 -m venv $ODOO_ROOT/.venvs/$main_branch/
     . $ODOO_ROOT/.venvs/$main_branch/bin/activate
     echo "Installing requirements..."
+    $ODOO_ROOT/.venvs/$main_branch/bin/python -m pip install --upgrade pip
     $ODOO_ROOT/.venvs/$main_branch/bin/python -m pip install -r <($git show $main_branch:requirements.txt)
   fi
   . $ODOO_ROOT/.venvs/$main_branch/bin/activate
