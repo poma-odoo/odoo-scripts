@@ -116,7 +116,8 @@ function clone() {
 # these functions will be availabe in shell and as `$0 command`
 #dodoo commands
 
-# Commands
+__o_modules__="$(find $ODOO_ROOT/odoo/odoo/addons -maxdepth 1 -type d -not -name '_*' -printf '%f ')$(find $ODOO_ROOT/odoo/addons -maxdepth 1 -type d -not -name '_*' -printf "%f ")$(find $ODOO_ROOT/enterprise -maxdepth 1 -type d -not -name '_*' -printf "%f ")"
+
 function o-branch() {
 ### : Prints current active branch if synced
     com=$(git -C $ODOO_ROOT/odoo branch --show-current)
@@ -150,19 +151,25 @@ function o-branch-com() {
      
 }
 
+
 function o-git() {
 ### git-command : runs a git command on enterprise and odoo synchronously, and upgrade only if it is on the same branch
 
 # check if branches are synced
-o-branch || return 1 
-ubranch=$(git -C $ODOO_ROOT/upgrade branch --show-current)
-if [ "$(o-branch)" == "$ubranch" ]; then
-  git -C $ODOO_ROOT/upgrade $* &
-fi
-git -C $ODOO_ROOT/enterprise $* &
-git -C $ODOO_ROOT/odoo $* &
-wait
+  o-branch || return 1 
+  ubranch=$(git -C $ODOO_ROOT/upgrade branch --show-current)
+  if [ "$(o-branch)" == "$ubranch" ]; then
+    git -C $ODOO_ROOT/upgrade $* &
+  fi
+  git -C $ODOO_ROOT/enterprise $* &
+  git -C $ODOO_ROOT/odoo $* &
+  wait
 }
+# git_compelete=$(complete -p git) # not working for unknown reason
+complete -o bashdefault -o default -o nospace -F __git_wrap__git_main o-git
+# complete ${git_compelete% *} o-git
+# unset git_compelete
+
 
 function o-module-path() {
 ### module_name : prints absolute path of the module 
@@ -174,6 +181,9 @@ function o-module-path() {
   echo $module_dir
   unset module module_dir
 }
+complete -W "$__o_modules__" o-module-path
+
+
 
 function o-venv() {
 ### : enables venv for the branch
@@ -189,9 +199,10 @@ function o-venv() {
     echo "venv not found for this the branch $main_branch, creating one in $ODOO_ROOT/.venvs/$main_branch/"
     py3=python3
     [ "$main_branch" = "13.0" ] && py3=python3.7
-    [ "$main_branch" = "14.0" ] && py3=python3.7
+    [ "$main_branch" = "14.0" ] && py3=python3.8
     [ "$main_branch" = "15.0" ] && py3=python3.9
     [ "$main_branch" = "16.0" ] && py3=python3.9
+    [ "$main_branch" = "master" ] && py3=python3.8
 
     $py3 -m venv $ODOO_ROOT/.venvs/$main_branch/
     . $ODOO_ROOT/.venvs/$main_branch/bin/activate
@@ -425,6 +436,8 @@ function o-init() {
   unset code
   unset modules
 }
+complete -W "${__o_modules__}" o-init
+
 
 function o-upgrade() {
 ### [-v] [module1,mudule2,...] : upgrades selected modules or all if no module provided and exits, with -v the info log are not suppressed
@@ -435,6 +448,7 @@ function o-upgrade() {
   _o_init_updgrade_progressbar_ -u $*
   fi
 }
+complete -W "${__o_modules__}" o-upgrade
 
 function o-test() {
 ### [-a|-e|-c] [-v|-vv|-q] test-tags : runs tests and exit, -a,-e,-c: all,enterprise,comunity, -v verbose, no post processing, -q show firstline trace of failed tests only
