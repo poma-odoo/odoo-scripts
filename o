@@ -165,10 +165,15 @@ function o-git() {
   git -C $ODOO_ROOT/odoo $* &
   wait
 }
-# git_compelete=$(complete -p git) # not working for unknown reason
-complete -o bashdefault -o default -o nospace -F __git_wrap__git_main o-git
+# git_compelete=$(complete -p git) # if git auto completion has never run in this session, this is empty is not 
 # complete ${git_compelete% *} o-git
 # unset git_compelete
+
+# __git_complete o-git __git_main # raises error if git auto complete has never run in this session
+
+# if git auto coplete has never run, gives an error but after using git complete one time, it works.
+# and it doesn't generate an error run time
+complete -o bashdefault -o default -o nospace -F __git_wrap__git_main o-git
 
 
 function o-module-path() {
@@ -202,7 +207,7 @@ function o-venv() {
     [ "$main_branch" = "14.0" ] && py3=python3.8
     [ "$main_branch" = "15.0" ] && py3=python3.9
     [ "$main_branch" = "16.0" ] && py3=python3.9
-    [ "$main_branch" = "master" ] && py3=python3.8
+    [ "$main_branch" = "master" ] && py3=python3.9
 
     $py3 -m venv $ODOO_ROOT/.venvs/$main_branch/
     . $ODOO_ROOT/.venvs/$main_branch/bin/activate
@@ -564,73 +569,76 @@ function o-test() {
 
 function o-psql() {
 ### : launches psql on current db
-psql `o-branch`
+  psql `o-branch`
 }
 
 function o-drop() {
 ### : drops active db
-dropdb -f --if-exists `o-branch`
+  dropdb -f --if-exists `o-branch`
 }
 
 function o-backup() {
 ### : copies current database to a temporary dbname-backup, overrights the backup
-dropdb -f --if-exists `o-branch`-backup
-createdb -T `o-branch` `o-branch`-backup
+  dropdb -f --if-exists `o-branch`-backup
+  createdb -T `o-branch` `o-branch`-backup
 }
 
 function o-restore() {
 ### : erase current db and retore backup taken with o-backup
-o-drop
-createdb -T `o-branch`-backup `o-branch`
+  o-drop
+  createdb -T `o-branch`-backup `o-branch`
 }
 
 function o-backup2() {
 ### : copies current database to a temporary dbname-backup2, overrights this backup 
-dropdb -f --if-exists `o-branch`-backup2
-createdb -T `o-branch` `o-branch`-backup2
+  dropdb -f --if-exists `o-branch`-backup2
+  createdb -T `o-branch` `o-branch`-backup2
 }
 
 function o-restore2() {
 ### : erase current db and retore backup taken with o-backup2
-o-drop
-createdb -T `o-branch`-backup2 `o-branch`
+  o-drop
+  createdb -T `o-branch`-backup2 `o-branch`
 }
 
 function o-trans-export() {
 ### [-i] module [lang]: installs the module and exports pot, or exports po file for module and selected language. -i means inplace, it overwrite the existing file in module 
 
-if [ "$1" == "-i" ]; then
-  shift
-  mpath=$(o-module-path $1)
-  if [ -z $mpath ]; then
-    echo "Module $1 not found." >&2
-    unset mpath 
-    return 3
+  if [ "$1" == "-i" ]; then
+    shift
+    mpath=$(o-module-path $1)
+    if [ -z $mpath ]; then
+      echo "Module $1 not found." >&2
+      unset mpath 
+      return 3
+    fi
   fi
-fi
-echo "Extracting${mpath+and replacing original file}..."
-[ -z "$2" ] && o-bin -d $(o-branch) -i ${1:?"module name is required"} --i18n-export ${mpath+$mpath/i18n/}$1.pot --modules $1 --st --log-level=error
-[ -n "$2" ] && o-bin -d $(o-branch) --i18n-export ${mpath+$mpath/i18n/}$2.po --modules $1 --load-language $2 --language $2 --st --log-level=error
-unset mpath 
+  echo "Extracting${mpath+and replacing original file}..."
+  [ -z "$2" ] && o-bin -d $(o-branch) -i ${1:?"module name is required"} --i18n-export ${mpath+$mpath/i18n/}$1.pot --modules $1 --st --log-level=error
+  [ -n "$2" ] && o-bin -d $(o-branch) --i18n-export ${mpath+$mpath/i18n/}$2.po --modules $1 --load-language $2 --language $2 --st --log-level=error
+  unset mpath 
 }
+complete -W "$__o_modules__" o-trans-export
 
 function o-trans-update() {
 ### module: exports a new pot file and upgrade all po files to match it. Overwrites the original files!
-module=$1
-mpath=$(o-module-path $module)
-[ -z $mpath ] && unset mpath; return 3
-echo "Extracting current terms to $mpath/i18n/$module.pot..."
-o-trans-export -i $module
-# pushd $mpath/i18n/
-# for trans in  *.po; do
-#   echo "Updating $mpath/i18n/$trans"
-#   msgmerge --update $trans $module.pot
-# done
-# popd
-#   msgmerge --update $trans $module.pot
+  module=$1
+  mpath=$(o-module-path $module)
+  [ -z $mpath ] && unset mpath; return 3
+  echo "Extracting current terms to $mpath/i18n/$module.pot..."
+  o-trans-export -i $module
+  # pushd $mpath/i18n/
+  # for trans in  *.po; do
+  #   echo "Updating $mpath/i18n/$trans"
+  #   msgmerge --update $trans $module.pot
+  # done
+  # popd
+  #   msgmerge --update $trans $module.pot
 
-unset module mpath trans
+  unset module mpath trans
 }
+complete -W "$__o_modules__" o-trans-update
+
 alias o-se=o-sync-to-ent
 ### -> shortcut for o-sync-ent
 alias o-sc=o-sync-to-com
