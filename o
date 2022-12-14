@@ -47,15 +47,14 @@ fi
 function o-help() {
 ### -> Display this help
 
-  scripts=$(sed -n '/^#dodoo commands$/,/^#dodoo end$/p' $0)
+  local scripts=$(sed -n '/^#dodoo commands$/,/^#dodoo end$/p' $0)
   awk '/^function o-/ { gsub(/[()]/ ,""); printf $2""}/^alias o-/ { gsub(/=.*/ ,""); printf $2""} /^\s*###/ { gsub("#",""); print}' <<< $scripts
-  unset scripts
 }
 
 function install() {
 ### [-n]: Adds o-Commands to bashrc/zsh, -n means do not update main branches from runbot acive branches
-  RCFILE=$(get_shell_rc)
-  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only  bash and zsh are supported" >&2 && unset RCFILE && return 2
+  local RCFILE=$(get_shell_rc)
+  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only  bash and zsh are supported" >&2 && return 2
   if [ ! "$1" = "-n" ] || [ -z "$ODOO_BRANCHES" ]; then ODOO_BRANCHES=$(_retrive_branches); fi
   counter=0
   while [ -f $RCFILE.obak$counter ]; do counter=$(expr $counter + 1); done 
@@ -79,8 +78,8 @@ function install() {
 }
 
 function uninstall() {
-  RCFILE=$(get_shell_rc)
-  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only bash and zsh are supported" >&2 && unset RCFILE && return 2
+  local RCFILE=$(get_shell_rc)
+  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only bash and zsh are supported" >&2 && return 2
   sed -i '/^#dodoo start/,/^#dodoo end/d' $RCFILE
 }
 
@@ -109,7 +108,6 @@ function clone() {
     $git remote set-url --push origin no_push #remove the possibility to push to odoo (you can only push to dev)
   done
   echo "all sources cloned in $ODOO_ROOT"
-  unset git
   }
 
 # Start of o-functions, everything from here to '#dodoo end' will be copied to bashrc in install
@@ -120,8 +118,8 @@ __o_modules__="$(find $ODOO_ROOT/odoo/odoo/addons -maxdepth 1 -type d -not -name
 
 function o-branch() {
 ### : Prints current active branch if synced
-    com=$(git -C $ODOO_ROOT/odoo branch --show-current)
-    ent=$(git -C $ODOO_ROOT/enterprise branch --show-current)
+    local com=$(git -C $ODOO_ROOT/odoo branch --show-current)
+    local ent=$(git -C $ODOO_ROOT/enterprise branch --show-current)
     if [ ${#com} -gt ${#ent} ];
     then
         if [[ $com == $ent* ]];
@@ -129,7 +127,6 @@ function o-branch() {
             echo $com
         else
             echo "Wrong branches" >&2
-            unset com ent
             return 77
         fi
     else
@@ -138,11 +135,9 @@ function o-branch() {
             echo $ent
         else
             echo "Wrong branches" >&2
-            unset com ent
             return 77
         fi
     fi
-unset com ent
 }
 
 function o-branch-com() {
@@ -165,9 +160,8 @@ function o-git() {
   git -C $ODOO_ROOT/odoo $* &
   wait
 }
-# git_compelete=$(complete -p git) # if git auto completion has never run in this session, this is empty is not 
+# local git_compelete=$(complete -p git) # if git auto completion has never run in this session, this is empty is not 
 # complete ${git_compelete% *} o-git
-# unset git_compelete
 
 # __git_complete o-git __git_main # raises error if git auto complete has never run in this session
 
@@ -178,13 +172,12 @@ complete -o bashdefault -o default -o nospace -F __git_wrap__git_main o-git
 
 function o-module-path() {
 ### module_name : prints absolute path of the module 
-  module=${1:-base}
+  local module_dir, module=${1:-base}
   [ -d $ODOO_ROOT/odoo/odoo/addons/$module ] && module_dir=$ODOO_ROOT/odoo/odoo/addons/$module
   [ -d $ODOO_ROOT/odoo/addons/$module ] && module_dir=$ODOO_ROOT/odoo/addons/$module
   [ -d $ODOO_ROOT/enterprise/$module ] && module_dir=$ODOO_ROOT/enterprise/$module
-  [ -z $module_dir ] && echo "Module not found $module" >&2 && unset module && return 3
+  [ -z $module_dir ] && echo "Module not found $module" >&2 && return 3
   echo $module_dir
-  unset module module_dir
 }
 complete -W "$__o_modules__" o-module-path
 
@@ -192,17 +185,16 @@ complete -W "$__o_modules__" o-module-path
 
 function o-venv() {
 ### : enables venv for the branch
-  git="git -C $ODOO_ROOT/odoo"
-  branch=$($git branch --show-current)
-  main_branch=${branch%%-*}
+  local git="git -C $ODOO_ROOT/odoo"
+  local branch=$($git branch --show-current)
+  local main_branch=${branch%%-*}
   if [[ ! $ODOO_BRANCHES =~ $main_branch ]]; then
     echo "Wrong branch name, branch name should begin with one of [ $ODOO_BRANCHES ] and a dash (-) e.g. master-xxx-yyy" >&2
-    unset git branch main_branch
     return 77
   fi
   if [ ! -f $ODOO_ROOT/.venvs/$main_branch/bin/python ]; then
     echo "venv not found for this the branch $main_branch, creating one in $ODOO_ROOT/.venvs/$main_branch/"
-    py3=python3
+    local py3=python3
     [ "$main_branch" = "13.0" ] && py3=python3.7
     [ "$main_branch" = "14.0" ] && py3=python3.8
     [ "$main_branch" = "15.0" ] && py3=python3.9
@@ -216,17 +208,16 @@ function o-venv() {
     $ODOO_ROOT/.venvs/$main_branch/bin/python -m pip install -r <($git show $main_branch:requirements.txt)
   fi
   . $ODOO_ROOT/.venvs/$main_branch/bin/activate
-  unset git branch main_branch
 }
 
 function o-get-args() {
 ### : tries to find odoo config in order from odoo root or home folder otherwise it generates a minimal commandline options for running odoo
+  local odoo_args
   [ -f $HOME/.odoorc ] && odoo_args="-c $HOME/.odoorc"
   [ -f $ODOO_ROOT/.odoorc ] && odoo_args="-c $ODOO_ROOT/.odoorc"
   [ -f $ODOO_ROOT/odoorc ] && odoo_args="-c $ODOO_ROOT/odoorc"
   [ -z "$odoo_args" ] && odoo_args="--addons-path=$ODOO_ROOT/odoo/odoo/addons,$ODOO_ROOT/odoo/addons,$ODOO_ROOT/enterprise --limit-time-cpu=99999999 --limit-time-real=99999999 --limit-memory-soft=17179869184 --limit-memory-hard=17179869184"
   echo $odoo_args -d `o-branch`
-  unset odoo_args
 }
 
 function o-prune() {
@@ -249,29 +240,25 @@ done
 function o-rebase-all() {
 ### [branch] : rebase provided branch to their latest version of main branches on all repos, for 15.0-z-y, it pulls 15.0 an rebases the branch onto it. Uses current branch if none given 
   for repo in $ODOO_REPOS; do
-    git="git -C $ODOO_ROOT/$repo"
-    branch=${1:-$($git branch --show-current)}
-    main_branch=${branch%%-*}
+    local git="git -C $ODOO_ROOT/$repo"
+    local branch=${1:-$($git branch --show-current)}
+    local main_branch=${branch%%-*}
     if [[ ! $ODOO_BRANCHES =~ $main_branch ]]; then
       echo "Wrong branch name, branch name should begin with one of [ $ODOO_BRANCHES ] and a dash (-) e.g. master-xxx-yyy" >&2
-      unset git branch main_branch
       return 77
     fi
     echo "Firstly, fetching $repo/$main_branch..."
     if ! $git fetch origin $main_branch:$main_branch; then
       echo "Failed to fetch origin/$main_branch" >&2
-      unset git branch main_branch
       return 88
     fi
     echo "Rebasing $repo/$branch onto $repo/$branch..."
     if ! $git rebase $main_branch $branch; then
       echo "Rebasing $repo/$branch onto $main_branch failed." >&2
-      unset git branch main_branch
       return 99
     fi
     [ -n "$1" ] && $git switch -
   done
-  unset git branch main_branch
 }
 
 function o-sync() {
@@ -281,12 +268,12 @@ function o-sync() {
     return 
   fi
 
-  src_repo=$1
-  repo=$2
-  src_branch=$(git -C $ODOO_ROOT/$src_repo branch --show-current)
-  branch=$src_branch
-  main_branch=${src_branch%%-*}
-  git="git -C $ODOO_ROOT/$repo"
+  local src_repo=$1
+  local repo=$2
+  local src_branch=$(git -C $ODOO_ROOT/$src_repo branch --show-current)
+  local branch=$src_branch
+  local main_branch=${src_branch%%-*}
+  local git="git -C $ODOO_ROOT/$repo"
   
   echo "Checking out $branch in $repo"
   if ! ($git switch "$branch" 2>/dev/null)
@@ -296,7 +283,6 @@ function o-sync() {
     $git branch --set-upstream-to=dev/$branch
     # git push -u dev $branch:$branch
   fi
-unset src_repo repo src_branch branch main_branch git
 }
 
 function o-sync-to-ent() {
@@ -422,6 +408,7 @@ function _o_init_updgrade_progressbar_() {
 
 function o-init() {
 ### [-v] [module1,module2,...] : initilize modules and exit, if no modules given, it installs l10n_generic_coa with -v the info log are not suppressed
+  local modules
   if [ "$1" == "-v" ]; then
     shift
     modules=${1-l10n_generic_coa}
@@ -432,14 +419,12 @@ function o-init() {
     shift
     _o_init_updgrade_progressbar_ -i $modules $*
   fi
-  code=$?
+  local code=$?
   if [ $code -eq 0 ]; then 
     echo "Operation successful"
   else
     echo "Exited with error code: $code"
   fi
-  unset code
-  unset modules
 }
 complete -W "${__o_modules__}" o-init
 
@@ -457,7 +442,7 @@ complete -W "${__o_modules__}" o-upgrade
 
 function o-test() {
 ### [-a|-e|-c] [-v|-vv|-q] test-tags : runs tests and exit, -a,-e,-c: all,enterprise,comunity, -v verbose, no post processing, -q show firstline trace of failed tests only
-  args="--max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test "
+  local args="--max-cron-threads=0 --test-enable --stop-after-init --no-http --log-level=test "
   
   scope=$1
   if [ "$1" == "-a" ]; then
@@ -564,7 +549,6 @@ function o-test() {
   fi
   echo "Exited with error code: ${PIPESTATUS[0]}${pipestatus[1]}"
   #second pipestatus is for zsh
-  unset args
 }
 
 function o-psql() {
@@ -603,30 +587,29 @@ function o-restore2() {
 
 function o-trans-export() {
 ### [-i] module [lang]: installs the module and exports pot, or exports po file for module and selected language. -i means inplace, it overwrite the existing file in module 
-
+  local mpath
   if [ "$1" == "-i" ]; then
     shift
     mpath=$(o-module-path $1)
     if [ -z $mpath ]; then
       echo "Module $1 not found." >&2
-      unset mpath 
       return 3
     fi
   fi
   echo "Extracting${mpath+and replacing original file}..."
   [ -z "$2" ] && o-bin -d $(o-branch) -i ${1:?"module name is required"} --i18n-export ${mpath+$mpath/i18n/}$1.pot --modules $1 --st --log-level=error
   [ -n "$2" ] && o-bin -d $(o-branch) --i18n-export ${mpath+$mpath/i18n/}$2.po --modules $1 --load-language $2 --language $2 --st --log-level=error
-  unset mpath 
 }
 complete -W "$__o_modules__" o-trans-export
 
 function o-trans-update() {
 ### module: exports a new pot file and upgrade all po files to match it. Overwrites the original files!
-  module=$1
-  mpath=$(o-module-path $module)
-  [ -z $mpath ] && unset mpath; return 3
+  local module=$1
+  local mpath=$(o-module-path $module)
+  [ -z $mpath ]; return 3
   echo "Extracting current terms to $mpath/i18n/$module.pot..."
   o-trans-export -i $module
+  # local trans
   # pushd $mpath/i18n/
   # for trans in  *.po; do
   #   echo "Updating $mpath/i18n/$trans"
@@ -634,8 +617,6 @@ function o-trans-update() {
   # done
   # popd
   #   msgmerge --update $trans $module.pot
-
-  unset module mpath trans
 }
 complete -W "$__o_modules__" o-trans-update
 
