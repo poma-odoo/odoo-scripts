@@ -160,15 +160,12 @@ function o-git() {
   git -C $ODOO_ROOT/odoo $* &
   wait
 }
-# local git_compelete=$(complete -p git) # if git auto completion has never run in this session, this is empty is not 
-# complete ${git_compelete% *} o-git
-
-# __git_complete o-git __git_main # raises error if git auto complete has never run in this session
-
-# if git auto coplete has never run, gives an error but after using git complete one time, it works.
-# and it doesn't generate an error run time
-complete -o bashdefault -o default -o nospace -F __git_wrap__git_main o-git
-
+# Got the idea from https://github.com/github/hub/commit/e172239fceca7c089f18a94a897c2b9842de96eb
+# If there is no git tab completion, but we have the _completion loader try to load it
+if ! declare -F _git > /dev/null && declare -F _completion_loader > /dev/null; then
+  _completion_loader git
+fi
+__git_complete o-git __git_main 
 
 function o-module-path() {
 ### module_name : prints absolute path of the module 
