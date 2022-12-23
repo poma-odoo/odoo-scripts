@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -ex
+#set -ex
 # trap read debug
 
 function _retrive_branches() {
@@ -49,14 +49,18 @@ function o-help() {
   awk '/^function o-/ { gsub(/[()]/ ,""); printf $2""}/^alias o-/ { gsub(/=.*/ ,""); printf $2""} /^\s*###/ { gsub("#",""); print}' <<< $scripts
 }
 
+function _backup_rc() {
+  local RCFILE=$1
+  [ -z "$RCFILE" ] && echo "No compatible shell found, currently only  bash and zsh are supported" >&2 && return 2
+  cp $RCFILE $RCFILE.obak`date +%Y%m%d_%H%M%S`
+  # clean up, do not keep more than 10 backups
+  ls -tp $RCFILE.obak* | tail -n +10 | xargs rm 
+}
 function install() {
 ### [-n]: Adds o-Commands to bashrc/zsh, -n means do not update main branches from runbot acive branches
   local RCFILE=$(get_shell_rc)
   [ -z "$RCFILE" ] && echo "No compatible shell found, currently only  bash and zsh are supported" >&2 && return 2
   if [ ! "$1" = "-n" ] || [ -z "$ODOO_BRANCHES" ]; then ODOO_BRANCHES=$(_retrive_branches); fi
-  counter=0
-  while [ -f $RCFILE.obak$counter ]; do counter=$(expr $counter + 1); done 
-  cp $RCFILE $RCFILE.obak$counter
   uninstall
   echo "#dodoo start" >> $RCFILE
   echo "export ODOO_ROOT='$ODOO_ROOT'" >>$RCFILE
@@ -78,6 +82,7 @@ function install() {
 function uninstall() {
   local RCFILE=$(get_shell_rc)
   [ -z "$RCFILE" ] && echo "No compatible shell found, currently only bash and zsh are supported" >&2 && return 2
+  _backup_rc $RCFILE
   sed -i '/^#dodoo start/,/^#dodoo end/d' $RCFILE
 }
 
