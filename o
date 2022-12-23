@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -ex
 # trap read debug
 
 function _retrive_branches() {
@@ -27,11 +27,9 @@ if [ "$1" != "clone" ]; then
   fi
   readonly ODOO_BIN=$ODOO_ROOT/odoo/odoo-bin
 
-  if [ -n "$ODOO_ROOT" ]; then
-    user_email=$(git -C  $ODOO_ROOT/odoo config user.email)
-    user_email=${user_email,,}
-    readonly ODOO_XGRAM=${user_email%%@*}
-  fi
+  user_email=$(git -C  $ODOO_ROOT/odoo config user.email)
+  user_email=${user_email,,}
+  readonly ODOO_XGRAM=${user_email%%@*}
 fi
 # private functions (no bashrc, no auto help)
 function  get_shell_rc() {
@@ -162,10 +160,11 @@ function o-git() {
 }
 # Got the idea from https://github.com/github/hub/commit/e172239fceca7c089f18a94a897c2b9842de96eb
 # If there is no git tab completion, but we have the _completion loader try to load it
-if ! declare -F _git > /dev/null && declare -F _completion_loader > /dev/null; then
+if ! declare -F __git_complete > /dev/null && declare -F _completion_loader > /dev/null; then
   _completion_loader git
 fi
-__git_complete o-git __git_main 
+# ensure __git_complete is loaded
+declare -F __git_complete > /dev/null && __git_complete o-git __git_main
 
 function o-module-path() {
 ### module_name : prints absolute path of the module 
@@ -317,8 +316,11 @@ function o-kill() {
 ### : kills all odoo instances
   if [ -x "$(command -v pkill)" ]; then 
     pkill -f $ODOO_BIN || true
-  else 
-    [ -x "$(command -v lsof)" ] && kill -9 $(lsof -i4:8069 -sTCP:LISTEN -Fp | cut -c2-) || true
+    echo "killed $ODOO_BIN" 
+  fi
+  if [ -x "$(command -v lsof)" ] && `lsof -i4:8069 -sTCP:LISTEN -Fp`; then
+    kill -9 $(lsof -i4:8069 -sTCP:LISTEN -Fp | cut -c2-) 2>/dev/null 
+    echo "killed by port scan."
   fi
 }
 
