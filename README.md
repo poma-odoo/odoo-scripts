@@ -2,7 +2,9 @@
 
 ## The *o* script
 
-### syntax: `o o-help|install|update|uninstall|clone|o-branch|o-branch-com|o-git|o-module-path|o-venv|o-get-args|o-prune|o-update-mains|o-rebase-all|o-sync|o-sync-to-ent|o-sync-to-com|o-bin|o-dev|o-shell|o-init|o-upgrade|o-test|o-psql|o-drop|o-backup|o-restore|o-trans-export|o-trans-update`
+### syntax: 
+
+`o o-help|install|update|uninstall|clone|o-branch|o-branch-com|o-git|o-module-path|o-venv|o-get-args|o-prune|o-update-mains|o-rebase-all|o-sync|o-sync-to-ent|o-sync-to-com|o-bin|o-dev|o-shell|o-init|o-upgrade|o-test|o-psql|o-drop|o-backup|o-restore|o-trans-export|o-trans-update`
 
 - **clone**: clones the repositories and setup git
 - **install**: adds o-commands to shell on next start
