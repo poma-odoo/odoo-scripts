@@ -1,269 +1,292 @@
+#!/usr/bin/env python3
 from json import dumps
 import sys
 
 data = {
     "BaseCommon": {
         "inherits": [],
-        "properties": {
+        "attributes": {
             "env": {
                 "type": "Environment",
-                "comment": "With disabled mail tracking"
+                "comment": "With disabled mail tracking",
             },
             "partner": {
-                "type": "res.partner",
-                "comment": "a new partner"
+                "type": "recordset",
+                "relation": "res.partner",
+                "comment": "a new partner",
             },
             "currency": {
-                "type": "res.currency",
-                "comment": "company_id.currency_id"
-            }
-        }
+                "type": "recordset",
+                "relation": "res.currency",
+                "comment": "company_id.currency_id",
+            },
+        },
     },
     "UomCommon": {
         "inherits": [],
-        "properties": {
-            "uom_gram": {
-                "type": "uom.uom"
-            },
-            "uom_kgm": {
-                "type": "uom.uom"
-            },
-            "uom_ton": {
-                "type": "uom.uom"
-            },
-            "uom_unit": {
-                "type": "uom.uom"
-            },
-            "uom_dozen": {
-                "type": "uom.uom"
-            },
+        "attributes": {
+            "uom_gram": {"type": "recordset", "relation": "uom.uom"},
+            "uom_kgm": {"type": "recordset", "relation": "uom.uom"},
+            "uom_ton": {"type": "recordset", "relation": "uom.uom"},
+            "uom_unit": {"type": "recordset", "relation": "uom.uom"},
+            "uom_dozen": {"type": "recordset", "relation": "uom.uom"},
             "group_uom": {
-                "type": "res.groups",
-                "comment": "Security group of uom access"
-            }
-        },
-        "methods": {
+                "type": "recordset",
+                "relation": "res.groups",
+                "comment": "Security group of uom access",
+            },
             "_enable_uom": {
-                "comment": "Enable uom group for current env's user"
+                "type": "method",
+                "comment": "Enable uom group for current env's user",
             },
             "_disable_uom": {
-                "comment": "Disable uom group for current env's user"
-            }
-        }
+                "type": "method",
+                "comment": "Disable uom group for current env's user",
+            },
+        },
     },
     "ProductCommon": {
-        "inherits": [
-            "BaseCommon",
-            "UomCommon"
-        ],
+        "inherits": ["BaseCommon", "UomCommon"],
         "does": "Set env's company currency to usd, disable all pricelists.",
-        "properties": {
+        "attributes": {
             "currency": {
-                "type": "res.currency",
+                "type": "recordset",
+                "relation": "res.currency",
                 "value": "USD",
-                "comment": "overrides BaseCommon.currency, also sets it as company currency"
+                "comment": "overrides BaseCommon.currency, also sets it as company currency",
             },
             "product_category": {
-                "type": "product.category",
-                "comment": "a new category"
+                "type": "recordset",
+                "relation": "product.category",
+                "comment": "a new category",
             },
             "product": {
-                "type": "product.product",
-                "comment": "a new consumable product, in cls.product_category"
+                "type": "recordset",
+                "relation": "product.product",
+                "comment": "a new consumable product, in cls.product_category",
             },
             "service_product": {
-                "type": "product.product",
-                "comment": "a new service product, in cls.product_category"
+                "type": "recordset",
+                "relation": "product.product",
+                "comment": "a new service product, in cls.product_category",
             },
             "consumable_product": {
-                "type": "product.product",
-                "comment": "pointer to cls.product"
+                "type": "recordset",
+                "relation": "product.product",
+                "comment": "pointer to cls.product",
             },
             "pricelist": {
-                "type": "product.pricelist",
-                "comment": "a new pricelist"
-            }
-        },
-        "methods": {
+                "type": "recordset",
+                "relation": "product.pricelist",
+                "comment": "a new pricelist",
+            },
             "_archive_other_pricelists": {
-                "comment": "Archive other pricelists, stupid method, the code should be in setupCLass instead"
-            }
-        }
+                "type": "method",
+                "comment": "Archive other pricelists, stupid method, the code should be in setupCLass instead",
+            },
+        },
     },
     "ProductAttributesCommon": {
-        "inherits": [
-            "ProductCommon"
-        ],
-        "properties": {
+        "inherits": ["ProductCommon"],
+        "attributes": {
             "size_attribute": {
-                "type": "product.attribute",
-                "comment": "A new attribute"
+                "type": "recordset",
+                "relation": "product.attribute",
+                "comment": "A new attribute",
             },
             "size_attribute_s": {
-                "type": "product.attribute.value"
+                "type": "recordset",
+                "relation": "product.attribute.value",
             },
             "size_attribute_m": {
-                "type": "product.attribute.value"
+                "type": "recordset",
+                "relation": "product.attribute.value",
             },
             "size_attribute_l": {
-                "type": "product.attribute.value"
+                "type": "recordset",
+                "relation": "product.attribute.value",
             },
             "color_attribute": {
-                "type": "product.attribute",
-                "comment": "A new attribute"
+                "type": "recordset",
+                "relation": "product.attribute",
+                "comment": "A new attribute",
             },
             "color_attribute_red": {
-                "type": "product.attribute.value"
+                "type": "recordset",
+                "relation": "product.attribute.value",
             },
             "color_attribute_blue": {
-                "type": "product.attribute.value"
+                "type": "recordset",
+                "relation": "product.attribute.value",
             },
             "color_attribute_green": {
-                "type": "product.attribute.value"
+                "type": "recordset",
+                "relation": "product.attribute.value",
             },
             "no_variant_attribute": {
-                "type": "product.attribute",
-                "comment": "A new attribute with no create"
+                "type": "recordset",
+                "relation": "product.attribute",
+                "comment": "A new attribute with no create",
             },
             "no_variant_attribute_extra": {
-                "type": "product.attribute.value"
+                "type": "recordset",
+                "relation": "product.attribute.value",
             },
             "no_variant_attribute_second": {
-                "type": "product.attribute.value"
+                "type": "recordset",
+                "relation": "product.attribute.value",
             },
             "dynamic_attribute": {
-                "type": "product.attribute",
-                "comment": "A new attribute with dynamic create, values dyn1 and dyn2"
-            }
-        }
+                "type": "recordset",
+                "relation": "product.attribute",
+                "comment": "A new attribute with dynamic create, values dyn1 and dyn2",
+            },
+        },
     },
     "ProductVariantsCommon": {
-        "inherits": [
-            "ProductAttributesCommon"
-        ],
-        "properties": {
+        "inherits": ["ProductAttributesCommon"],
+        "attributes": {
             "product_template_sofa": {
-                "type": "product.template",
-                "comment": "A new product template, with three cls.color_attribute values."
+                "type": "recordset",
+                "relation": "product.template",
+                "comment": "A new product template, with three cls.color_attribute values.",
             },
             "cls.product_template_shirt": {
-                "type": "product.template",
-                "comment": "A new product template, with on cls.size_attribute value"
-            }
-        }
+                "type": "recordset",
+                "relation": "product.template",
+                "comment": "A new product template, with on cls.size_attribute value",
+            },
+        },
     },
     "TestProductCommon": {
-        "inherits": [
-            "ProductVariantsCommon"
-        ],
-        "properties": {
+        "inherits": ["ProductVariantsCommon"],
+        "attributes": {
             "uom_dunit": {
-                "type": "uom.uom",
-                "comment": "Deci Unit, 10 x unit"
+                "type": "recordset",
+                "relation": "uom.uom",
+                "comment": "Deci Unit, 10 x unit",
             },
             "product_1": {
-                "type": "product.product",
+                "type": "recordset",
+                "relation": "product.product",
                 "value": "[PROD-1] Courage",
-                "comment": "a new consumable product, no categ, uom_dunit"
+                "comment": "a new consumable product, no categ, uom_dunit",
             },
             "product_2": {
-                "type": "product.product",
+                "type": "recordset",
+                "relation": "product.product",
                 "value": "Wood",
-                "comment": "a new consumable product, no categ, no nothing"
-            }
+                "comment": "a new consumable product, no categ, no nothing",
+            },
         },
         "prod_att_1": {
-            "type": "product.attribute",
-            "value": "cls.color_attribute"
+            "type": "recordset",
+            "relation": "product.attribute",
+            "value": "cls.color_attribute",
         },
         "prod_attr1_v1": {
-            "type": "product.attribute.value",
-            "value": "cls.color_attribute_red"
+            "type": "recordset",
+            "relation": "product.attribute.value",
+            "value": "cls.color_attribute_red",
         },
         "prod_attr1_v2": {
-            "type": "product.attribute.value",
-            "value": "cls.color_attribute_blue"
+            "type": "recordset",
+            "relation": "product.attribute.value",
+            "value": "cls.color_attribute_blue",
         },
         "prod_attr1_v3": {
-            "type": "product.attribute.value",
-            "value": "cls.color_attribute_green"
+            "type": "recordset",
+            "relation": "product.attribute.value",
+            "value": "cls.color_attribute_green",
         },
         "product_7_template": {
-            "type": "product.template",
+            "type": "recordset",
+            "relation": "product.template",
             "value": "cls.product_template_sofa",
-            "comment": "Pointer to cls.product_template_sofa"
+            "comment": "Pointer to cls.product_template_sofa",
         },
         "product_7_attr1_v1": {
-            "type": "product.template.attribute.value"
+            "type": "recordset",
+            "relation": "product.template.attribute.value",
         },
         "product_7_attr1_v2": {
-            "type": "product.template.attribute.value"
+            "type": "recordset",
+            "relation": "product.template.attribute.value",
         },
         "product_7_attr1_v3": {
-            "type": "product.template.attribute.value"
+            "type": "recordset",
+            "relation": "product.template.attribute.value",
         },
         "product_7_1": {
-            "type": "product.product",
-            "comment": "Variant of cls.product_7_attr1_v1"
+            "type": "recordset",
+            "relation": "product.product",
+            "comment": "Variant of cls.product_7_attr1_v1",
         },
         "product_7_2": {
-            "type": "product.product",
-            "comment": "Variant of cls.product_7_attr1_v2"
+            "type": "recordset",
+            "relation": "product.product",
+            "comment": "Variant of cls.product_7_attr1_v2",
         },
         "product_7_3": {
-            "type": "product.product",
-            "comment": "Variant of cls.product_7_attr1_v3"
-        }
+            "type": "recordset",
+            "relation": "product.product",
+            "comment": "Variant of cls.product_7_attr1_v3",
+        },
     },
     "common2.TestStockCommon": {
-        "inherits": [
-            "TestProductCommon"
-        ],
-        "properties": {
+        "inherits": ["TestProductCommon"],
+        "attributes": {
             "user_stock_user": {
-                "type": "res.users",
+                "type": "recordset",
+                "relation": "res.users",
                 "value": "pauline",
-                "comment": "New user with 'stock.group_stock_user' group"
+                "comment": "New user with 'stock.group_stock_user' group",
             },
             "user_stock_manager": {
-                "type": "res.users",
+                "type": "recordset",
+                "relation": "res.users",
                 "value": "julie",
-                "comment": "New user with 'stock.group_stock_manager' group"
+                "comment": "New user with 'stock.group_stock_manager' group",
             },
             "warehouse_1": {
-                "type": "stock.warehouse",
+                "type": "recordset",
+                "relation": "stock.warehouse",
                 "comment": "New warehouse with one step in and out",
-                "value": "BWH"
+                "value": "BWH",
             },
             "location_1": {
-                "type": "stock.location",
+                "type": "recordset",
+                "relation": "stock.location",
                 "comment": "Internal stock location of cls.warehouse_1",
-                "value": "cls.warehouse_1.lot_stock_id.id"
+                "value": "cls.warehouse_1.lot_stock_id.id",
             },
             "partner_1": {
-                "type": "res.partner",
-                "comment": "new partner"
+                "type": "recordset",
+                "relation": "res.partner",
+                "comment": "new partner",
             },
             "product_3": {
-                "type": "product.product",
+                "type": "recordset",
+                "relation": "product.product",
                 "comment": "New consu product, in dozens",
-                "value": "Stone"
+                "value": "Stone",
             },
             "existing_inventories": {
-                "type": "stock.quant",
-                "comment": "Stock quants with inventory qty"
+                "type": "recordset",
+                "relation": "stock.quant",
+                "comment": "Stock quants with inventory qty",
             },
             "existing_quants": {
-                "type": "stock.quant",
-                "comment": "All existing quands in the universe"
-            }
-        },
-        "methods": {
+                "type": "recordset",
+                "relation": "stock.quant",
+                "comment": "All existing quands in the universe",
+            },
             "_create_move": {
-                "comment": "Create a stock move as stock manager"
-            }
-        }
-    }
+                "type": "method",
+                "comment": "Create a stock move as stock manager",
+            },
+        },
+    },
 }
 
 
@@ -271,37 +294,47 @@ def get_available_attributes(test_class):
     if test_class not in data:
         return {}
     inherits = list(data[test_class].get("inherits", []))
-    properties = dict(**data[test_class].get("properties", {}))
-    methods = dict(**data[test_class].get("methods", {}))
+    attributes = dict(**data[test_class].get("attributes", {}))
     while inherits:
         parent = data.get(inherits.pop())
         if not parent:
             continue
         if parent.get("inherits"):
             inherits.extend(parent["inherits"])
-        for prop, value_dict in parent.get("properties", {}).items():
-            properties.setdefault(prop, dict(**value_dict))
-        for method, value_dict in parent.get("methods", {}).items():
-            methods.setdefault(method, dict(**value_dict))
+        for attrib, value_dict in parent.get("attributes", {}).items():
+            attributes.setdefault(attrib, dict(**value_dict))
 
-    return {
-        "properties": properties,
-        "methods": methods
-    }
-
+    return attributes
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print(f"""
+        print(
+            f"""
 The hitchhiker's guide to common tests.
 =======================================
 Usage: {sys.argv[0]} <common_test_class_name>"
  
 If the class name is not unique add the unit file name,
 if still not unique, add module. e.g. common2.TestStockCommon
-""")
+"""
+        )
         sys.exit(1)
-    common_class = sys.argv[1]
-    print(dumps(get_available_attributes(common_class), indent=2))
+    query = sys.argv[1]
+    common_classes = []
+    if query in data:
+        common_classes.append(query)
+    else:
+        print(f"Unknown common test class {query}, trying to find it heuristically...")
+        for cls in data:
+            if query in cls:
+                print(f"Found common test class {cls}")
+                common_classes.append(cls)
 
+    if len(common_classes) == 0:
+        print(f"Could not find common test class {sys.argv[1]}")
+        sys.exit(1)
+    for common_class in common_classes:
+        if len(common_classes) > 1:
+            print(f"======= {common_class} ========")
+        print(dumps(get_available_attributes(common_class), indent=2))
