@@ -12,6 +12,7 @@ from multiprocessing import Process, Queue
 from queue import Empty
 
 from io import StringIO
+from collections import defaultdict
 import sys
 
 try:
@@ -27,6 +28,7 @@ capture_regexes= {
 }
 capture_regex=r".*"
 q = Queue()
+
 
 def on_key_pressed(key):
     global q
@@ -245,7 +247,7 @@ def apply_defaults(args_dict, defaults):
 
     If an argument is present in both the arguments dictionary and the defaults,
     if the default value is a list, it will be merged with the value from the
-    arguments dictionary, otherwise otherwise
+    arguments dictionary, otherwise 
 
     Parameters:
     args_dict (dict): A dictionary containing command-line arguments.
@@ -277,8 +279,9 @@ def get_defaults(addons_path, dev_branch, odoo_version, test_mode=False):
     defaults = {
         "--addons-path": addons_path,
         "--log-level": "debug",
-        "--limit-time-real": 0,
-        "--limit-time-cpu": 0,
+        "--limit-time-real-cron": 900,
+        "--limit-time-real": 150,
+        "--limit-time-cpu": 150,
         "--workers": 0,
         "--dev": "all",
         "--max-cron-threads": 0,
@@ -372,6 +375,21 @@ def main():
     addons_path = get_addons_path(dev_dir, src_path)
 
     args_dict = parse_argv(sys.argv)
+    runner_args = defaultdict(lambda : None)
+    for arg in tuple(args_dict.keys()):
+        if arg.startswith("--runner-no-"):
+            runner_args[arg.split("--runner-no-")[1]] = not args_dict.pop(arg)
+        elif arg.startswith("--runner-"):
+            runner_args[arg.split("--runner-")[1]] = args_dict.pop(arg) or True
+
+    if hasattr(sys, 'gettrace') and sys.gettrace() is not None:
+        # in debug mode
+        _logger.debug("In debug mode, force disabled keyboard shortcuts")
+        runner_args["keyboard"] = False
+
+    if runner_args["log-level"]:
+        global capture_regex
+        capture_regex = capture_regexes.get(runner_args["log-level"],capture_regex)
     defaults = get_defaults(
         addons_path,
         dev_branch,
@@ -422,7 +440,10 @@ def main():
     patch_logging_warning()
     sys.path.append(f"{src_path}/odoo")
     import odoo
-    from asyncio import set_event_loop_policy
+    # Option 3: Shell (not really an option, keep this code uncommented)
+    if sys.argv[1] == "shell" or not runner_args["keyboard"]:
+        exit(odoo.cli.main())
+
 
     if "15.0" < odoo_version < "18.0": patch_http(odoo)
 
@@ -441,9 +462,6 @@ def main():
 #             f.write(p.json())
 #         exit()
 
-# Option 3: Shell (not really an option, keep this code uncommented)
-    if sys.argv[1] == "shell":
-        exit(odoo.cli.main())
 
 ## With keyboard hook
 
